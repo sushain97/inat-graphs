@@ -205,8 +205,12 @@ def print_new_needs_id_species(summary: ObservationSummary):
 
 
 def print_best_days_new_needs_id_species(
+    summary: ObservationSummary,
     best_days_needs_id_species: dict[str, set[str]],
 ):
+    needs_id_species = set(
+        _species_name(taxon.name) for taxon in summary.needs_id_taxons
+    )
     print("# Needs ID Species for Best Days")
     print()
     for day, species in best_days_needs_id_species.items():
@@ -215,7 +219,10 @@ def print_best_days_new_needs_id_species(
         print(
             f"{day} ({len(species)}): "
             + ", ".join(
-                f"{common_name if common_name else species_name}"
+                (
+                    f"{common_name if common_name else species_name}"
+                    + (" ⭐" if species_name in needs_id_species else "")
+                )
                 for species_name, common_name in species
             )
         )
@@ -269,7 +276,7 @@ def main():
     best_days_needs_id_species = print_day_unique_species_chart(summary)
     print_day_new_unique_species_chart(summary)
     print_new_needs_id_species(summary)
-    print_best_days_new_needs_id_species(best_days_needs_id_species)
+    print_best_days_new_needs_id_species(summary, best_days_needs_id_species)
 
 
 if __name__ == "__main__":
