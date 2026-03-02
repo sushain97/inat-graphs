@@ -1,24 +1,10 @@
 #!/usr/bin/env python3
 
 import collections
-import dataclasses
 import itertools
-import pyinaturalist
 import termgraph
 
-
-@dataclasses.dataclass
-class ObservationSummary:
-    research_grade_observations: list[pyinaturalist.Observation]
-    research_grade_taxons: set[pyinaturalist.Taxon]
-    needs_id_observations: list[pyinaturalist.Observation]
-    needs_id_taxons: set[pyinaturalist.Taxon]
-
-
-def _species_name(name: str) -> str:
-    if "×" in name:
-        return name
-    return " ".join(name.split(" ")[:2])
+from utils import ObservationSummary, get_observations, species_name
 
 
 def print_lifetime_unique_species_chart(
@@ -134,9 +120,9 @@ def print_day_new_unique_species_chart(summary: ObservationSummary):
     for obs in sorted(
         summary.research_grade_observations, key=lambda obs: obs.observed_on.date()
     ):
-        species_name = _species_name(obs.taxon.name)
-        if species_name not in seen_species:
-            seen_species.add(species_name)
+        name = species_name(obs.taxon.name)
+        if name not in seen_species:
+            seen_species.add(name)
             iconic_taxons.add(obs.taxon.iconic_taxon_name)
             new_species_by_day_and_iconic_taxon[obs.observed_on.date()][
                 obs.taxon.iconic_taxon_name
@@ -177,28 +163,28 @@ def print_day_new_unique_species_chart(summary: ObservationSummary):
 
 def print_new_needs_id_species(summary: ObservationSummary):
     research_grade_species_taxons = set(
-        _species_name(taxon.name) for taxon in summary.research_grade_taxons
+        species_name(taxon.name) for taxon in summary.research_grade_taxons
     )
     new_needs_id_species_observations = itertools.groupby(
         sorted(
             [
                 obs
                 for obs in summary.needs_id_observations
-                if _species_name(obs.taxon.name) not in research_grade_species_taxons
+                if species_name(obs.taxon.name) not in research_grade_species_taxons
             ],
             key=lambda obs: obs.observed_on,
             reverse=True,
         ),
-        key=lambda obs: _species_name(obs.taxon.name),
+        key=lambda obs: species_name(obs.taxon.name),
     )
 
     print()
     print("# New Needs ID Species Observations")
     print()
-    for species_name, group in new_needs_id_species_observations:
+    for name, group in new_needs_id_species_observations:
         observations = list(group)
         print(
-            f"{observations[0].taxon.emoji} {species_name}{f' ({observations[0].taxon.preferred_common_name})' if observations[0].taxon.preferred_common_name else ''}: "
+            f"{observations[0].taxon.emoji} {name}{f' ({observations[0].taxon.preferred_common_name})' if observations[0].taxon.preferred_common_name else ''}: "
             + f"{', '.join(str(obs.observed_on.date()) for obs in observations)}"
         )
     print()
@@ -209,7 +195,7 @@ def print_best_days_new_needs_id_species(
     best_days_needs_id_species: dict[str, set[str]],
 ):
     needs_id_species = set(
-        _species_name(taxon.name) for taxon in summary.needs_id_taxons
+        species_name(taxon.name) for taxon in summary.needs_id_taxons
     )
     print("# Needs ID Species for Best Days")
     print()
@@ -229,48 +215,8 @@ def print_best_days_new_needs_id_species(
     print()
 
 
-def summarize_observations(
-    observations: list[pyinaturalist.Observation],
-) -> ObservationSummary:
-
-    species_observations = [
-        obs
-        for obs in observations
-        if obs.taxon.rank in ["species", "hybrid", "variety", "subspecies"]
-    ]
-
-    research_grade_observations = [
-        obs for obs in species_observations if obs.quality_grade == "research"
-    ]
-    needs_id_observations = [
-        obs for obs in species_observations if obs.quality_grade == "needs_id"
-    ]
-
-    research_grade_taxons = {
-        _species_name(obs.taxon.name): obs.taxon for obs in research_grade_observations
-    }
-    needs_id_taxons = {
-        _species_name(obs.taxon.name): obs.taxon
-        for obs in needs_id_observations
-        if _species_name(obs.taxon.name) not in research_grade_taxons
-    }
-
-    return ObservationSummary(
-        research_grade_observations=research_grade_observations,
-        research_grade_taxons=list(research_grade_taxons.values()),
-        needs_id_observations=needs_id_observations,
-        needs_id_taxons=list(needs_id_taxons.values()),
-    )
-
-
 def main():
-    session = pyinaturalist.ClientSession()
-    response = pyinaturalist.get_observations(
-        user_id="sushain", session=session, page="all"
-    )
-    observations = pyinaturalist.Observation.from_json_list(response["results"])
-
-    summary = summarize_observations(observations)
+    summary, _ = get_observations()
 
     print_lifetime_unique_species_chart(summary)
     best_days_needs_id_species = print_day_unique_species_chart(summary)
