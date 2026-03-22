@@ -82,7 +82,7 @@ def print_day_unique_species_chart(
             )
             for day in all_days
         ],
-        key=lambda x: x[3],
+        key=lambda x: (x[3], x[1]),
         reverse=True,
     )[:10]
 
@@ -147,7 +147,7 @@ def print_day_new_unique_species_chart(summary: ObservationSummary):
             categories=represented_iconic_taxons,
         ),
         termgraph.Args(
-            title="Top Days by New Unique Species Observed",
+            title="Top Days by New Research Grade Species Observed",
             colors=[
                 termgraph.Colors.Green,
                 termgraph.Colors.Red,
