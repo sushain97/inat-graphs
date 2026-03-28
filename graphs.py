@@ -185,7 +185,7 @@ def print_new_needs_id_species(summary: ObservationSummary):
         observations = list(group)
         print(
             f"{observations[0].taxon.emoji} {name}{f' ({observations[0].taxon.preferred_common_name})' if observations[0].taxon.preferred_common_name else ''}: "
-            + f"{', '.join(str(obs.observed_on.date()) for obs in observations)}"
+            + f"{', '.join(sorted(set(str(obs.observed_on.date()) for obs in observations), reverse=True))}"
         )
     print()
 
@@ -215,6 +215,30 @@ def print_best_days_new_needs_id_species(
     print()
 
 
+def print_most_seen_species(summary: ObservationSummary):
+    print("# Most Seen Research Grade Species")
+    print()
+    species_observations = itertools.groupby(
+        sorted(
+            summary.research_grade_observations,
+            key=lambda obs: obs.taxon.preferred_common_name,
+        ),
+        key=lambda obs: obs.taxon.preferred_common_name,
+    )
+    most_seen_species = sorted(
+        [
+            (species, set(obs.observed_on.date() for obs in observations))
+            for species, observations in species_observations
+        ],
+        key=lambda x: len(x[1]),
+        reverse=True,
+    )[:5]
+
+    for species, days in most_seen_species:
+        print(f"{len(days):>2} {species}")
+    print()
+
+
 def main():
     summary, _ = get_observations()
 
@@ -223,6 +247,7 @@ def main():
     print_day_new_unique_species_chart(summary)
     print_new_needs_id_species(summary)
     print_best_days_new_needs_id_species(summary, best_days_needs_id_species)
+    print_most_seen_species(summary)
 
 
 if __name__ == "__main__":
