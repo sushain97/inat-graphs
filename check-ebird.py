@@ -13,9 +13,13 @@ def main():
         ebird_taxons = {
             obs["Scientific Name"]
             .replace(" (Domestic type)", "")
-            .replace(" (Feral Pigeon)", ""): obs["Common Name"]
+            .replace(" (Feral Pigeon)", "")
+            .replace(
+                "Larus occidentalis x glaucescens", "Larus glaucescens × occidentalis"
+            ): obs["Common Name"]
             for obs in ebird_observations
         }
+
         inat_taxons = {
             species_name(taxon.name): taxon.preferred_common_name
             for taxon in inat_observations.research_grade_taxons
@@ -26,7 +30,7 @@ def main():
         }
 
         for taxon in ebird_taxons.keys() - inat_taxons.keys():
-            needs_id = taxon in inat_needs_id_taxons
+            needs_id = taxon in inat_needs_id_taxons or taxon in ["Larus livens"]
             print(
                 f"Missing in iNaturalist:{' [NEEDS-ID]' if needs_id else ''} {ebird_taxons[taxon]} ({taxon})"
             )

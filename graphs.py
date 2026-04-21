@@ -2,6 +2,7 @@
 
 import collections
 import itertools
+import pyinaturalist
 import termgraph
 
 from utils import ObservationSummary, get_observations, species_name
@@ -111,22 +112,14 @@ def print_day_unique_species_chart(
     }
 
 
-def print_day_new_unique_species_chart(summary: ObservationSummary):
-    seen_species = set()
+def print_day_new_lifetime_species_chart(summary: ObservationSummary):
     new_species_by_day_and_iconic_taxon = collections.defaultdict(
         lambda: collections.Counter()
     )
-    iconic_taxons = set()
-    for obs in sorted(
-        summary.research_grade_observations, key=lambda obs: obs.observed_on.date()
-    ):
-        name = species_name(obs.taxon.name)
-        if name not in seen_species:
-            seen_species.add(name)
-            iconic_taxons.add(obs.taxon.iconic_taxon_name)
-            new_species_by_day_and_iconic_taxon[obs.observed_on.date()][
-                obs.taxon.iconic_taxon_name
-            ] += 1
+    for obs in summary.first_research_observations:
+        new_species_by_day_and_iconic_taxon[obs.observed_on.date()][
+            obs.taxon.iconic_taxon_name
+        ] += 1
 
     best_days = sorted(
         new_species_by_day_and_iconic_taxon.items(),
@@ -239,12 +232,68 @@ def print_most_seen_species(summary: ObservationSummary):
     print()
 
 
+def print_locality_new_lifetime_species_chart(
+    session: pyinaturalist.ClientSession, summary: ObservationSummary
+):
+    new_species_by_locality_and_iconic_taxon = collections.defaultdict(
+        lambda: collections.Counter()
+    )
+    iconic_taxon_counts = collections.defaultdict(int)
+    for obs in summary.first_research_observations:
+        locality = pyinaturalist.get_places_by_id(obs.place_ids[1], session=session)[
+            "results"
+        ][0]["display_name"]
+        new_species_by_locality_and_iconic_taxon[locality][
+            obs.taxon.iconic_taxon_name
+        ] += 1
+        iconic_taxon_counts[obs.taxon.iconic_taxon_name] += 1
+
+    best_localities = sorted(
+        new_species_by_locality_and_iconic_taxon.items(),
+        key=lambda x: sum(x[1].values()),
+        reverse=True,
+    )[:10]
+    represented_iconic_taxons = sorted(
+        iconic_taxon_counts.keys(),
+        key=lambda taxon: iconic_taxon_counts[taxon],
+        reverse=True,
+    )
+
+    termgraph.StackedChart(
+        termgraph.Data(
+            data=[
+                [counts.get(taxon, 0) for taxon in represented_iconic_taxons]
+                for _, counts in best_localities
+            ],
+            labels=[str(locality) for locality, _ in best_localities],
+            categories=represented_iconic_taxons,
+        ),
+        termgraph.Args(
+            title="Top Localities by New Research Grade Species Observed",
+            colors=[
+                termgraph.Colors.Green,
+                termgraph.Colors.Red,
+                termgraph.Colors.Blue,
+                termgraph.Colors.Magenta,
+                termgraph.Colors.Cyan,
+                termgraph.Colors.Yellow,
+                termgraph.Colors.Black,
+                33,
+            ],
+            format="{:<6.0f}",
+            width=100,
+        ),
+    ).draw()
+
+
 def main():
-    summary, _ = get_observations()
+    session = pyinaturalist.ClientSession()
+    summary, _ = get_observations(session)
 
     print_lifetime_unique_species_chart(summary)
     best_days_needs_id_species = print_day_unique_species_chart(summary)
-    print_day_new_unique_species_chart(summary)
+    print_day_new_lifetime_species_chart(summary)
+    print_locality_new_lifetime_species_chart(session, summary)
     print_new_needs_id_species(summary)
     print_best_days_new_needs_id_species(summary, best_days_needs_id_species)
     print_most_seen_species(summary)
