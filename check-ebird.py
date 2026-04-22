@@ -3,11 +3,14 @@
 import fileinput
 import csv
 
+import pyinaturalist
+
 from utils import get_observations, species_name
 
 
 def main():
-    inat_observations, _ = get_observations()
+    session = pyinaturalist.ClientSession()
+    inat_observations, _ = get_observations(session)
     with fileinput.input() as ebird_csv_file:
         ebird_observations = csv.DictReader(ebird_csv_file)
         ebird_taxons = {
@@ -35,7 +38,7 @@ def main():
                 f"Missing in iNaturalist:{' [NEEDS-ID]' if needs_id else ''} {ebird_taxons[taxon]} ({taxon})"
             )
         for taxon in inat_taxons.keys() - ebird_taxons.keys():
-            print(f"      Missing in Ebird: {inat_taxons[taxon]} ({taxon})")
+            print(f"      Missing in eBird: {inat_taxons[taxon]} ({taxon})")
 
 
 if __name__ == "__main__":
