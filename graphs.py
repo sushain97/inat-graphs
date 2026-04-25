@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import collections
+import datetime
 import itertools
+import json
 import pyinaturalist
 import termgraph
 
@@ -158,12 +160,14 @@ def print_new_needs_id_species(summary: ObservationSummary):
     research_grade_species_taxons = set(
         species_name(taxon.name) for taxon in summary.research_grade_taxons
     )
+    min_date = datetime.date.today() - datetime.timedelta(days=30)
     new_needs_id_species_observations = itertools.groupby(
         sorted(
             [
                 obs
                 for obs in summary.needs_id_observations
                 if species_name(obs.taxon.name) not in research_grade_species_taxons
+                and obs.observed_on.date() >= min_date
             ],
             key=lambda obs: obs.observed_on,
             reverse=True,
@@ -172,7 +176,7 @@ def print_new_needs_id_species(summary: ObservationSummary):
     )
 
     print()
-    print("# New Needs ID Species Observations")
+    print("# New Needs ID Species Observations (last 30 days)")
     print()
     for name, group in new_needs_id_species_observations:
         observations = list(group)
@@ -187,13 +191,16 @@ def print_best_days_new_needs_id_species(
     summary: ObservationSummary,
     best_days_needs_id_species: dict[str, set[str]],
 ):
+    min_date = datetime.date.today() - datetime.timedelta(days=30)
     needs_id_species = set(
         species_name(taxon.name) for taxon in summary.needs_id_taxons
     )
-    print("# Needs ID Species for Best Days")
+    print("# Needs ID Species for Best Days (last month)")
     print()
-    for day, species in best_days_needs_id_species.items():
-        if not species:
+    for day, species in sorted(
+        best_days_needs_id_species.items(), key=lambda d: d, reverse=True
+    ):
+        if day < min_date or not species:
             continue
         print(
             f"{day} ({len(species)}): "
@@ -205,12 +212,9 @@ def print_best_days_new_needs_id_species(
                 for species_name, common_name in species
             )
         )
-    print()
 
 
 def print_most_seen_species(summary: ObservationSummary):
-    print("# Most Seen Research Grade Species")
-    print()
     species_observations = itertools.groupby(
         sorted(
             summary.research_grade_observations,
@@ -227,9 +231,17 @@ def print_most_seen_species(summary: ObservationSummary):
         reverse=True,
     )[:5]
 
-    for species, days in most_seen_species:
-        print(f"{len(days):>2} {species}")
-    print()
+    termgraph.BarChart(
+        termgraph.Data(
+            data=[len(obs) for _, obs in most_seen_species],
+            labels=[s for s, _ in most_seen_species],
+        ),
+        termgraph.Args(
+            title="Most Seen Research Grade Species",
+            format="{:<6.0f}",
+            width=100,
+        ),
+    ).draw()
 
 
 def print_locality_new_lifetime_species_chart(
@@ -286,6 +298,71 @@ def print_locality_new_lifetime_species_chart(
     ).draw()
 
 
+def print_wingspan_set_coverage(summary: ObservationSummary):
+    with open("wingspan-master.json") as wingspan_data_file:
+        wingspan_data = json.load(wingspan_data_file)
+    birds_by_set = {
+        k: list(v)
+        for (k, v) in itertools.groupby(
+            sorted(wingspan_data, key=lambda w: w["Set"]), key=lambda w: w["Set"]
+        )
+    }
+    research_grade_species = {t.name for t in summary.research_grade_taxons}
+    needs_id_species = {t.name for t in summary.needs_id_taxons}
+
+    def category_fn(bird):
+        name = bird["Scientific name"]
+        if name in research_grade_species:
+            return "Research Grade"
+        if name in needs_id_species:
+            return "Needs ID"
+        return "Missing"
+
+    categories = [
+        "Research Grade",
+        "Needs ID",
+        "Missing",
+    ]
+
+    counts_by_set = dict(
+        sorted(
+            {
+                s: {
+                    k: len(list(v))
+                    for (k, v) in itertools.groupby(
+                        sorted(birds, key=category_fn), key=category_fn
+                    )
+                }
+                | {"Total": len(birds)}
+                for s, birds in birds_by_set.items()
+            }.items(),
+            key=lambda i: i[1].get("Research Grade", 0),
+            reverse=True,
+        )
+    )
+
+    termgraph.StackedChart(
+        termgraph.Data(
+            data=[[v.get(c, 0) for c in categories] for v in counts_by_set.values()],
+            labels=[
+                f"{s:<11} ({v.get('Research Grade', 0):>2}/{v['Total']:>3})"
+                for (s, v) in counts_by_set.items()
+            ],
+            categories=categories,
+        ),
+        termgraph.Args(
+            title=f"Wingspan Set Coverage ({sum(v.get('Research Grade', 0) for v in counts_by_set.values())}/{sum(v['Total'] for v in counts_by_set.values())})",
+            width=80,
+            no_values=True,
+            colors=[
+                termgraph.Colors.Green,
+                termgraph.Colors.Yellow,
+                37,
+            ],
+        ),
+    ).draw()
+
+
 def main():
     session = pyinaturalist.ClientSession()
     summary, _ = get_observations(session)
@@ -297,6 +374,8 @@ def main():
     print_new_needs_id_species(summary)
     print_best_days_new_needs_id_species(summary, best_days_needs_id_species)
     print_most_seen_species(summary)
+    print_wingspan_set_coverage(summary)
+    print()
 
 
 if __name__ == "__main__":
