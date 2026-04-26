@@ -1,11 +1,14 @@
 import datetime
 import fileinput
 
+import pyinaturalist
+
 from utils import get_observations, species_name
 
 
 def main():
-    summary, _ = get_observations()
+    session = pyinaturalist.ClientSession()
+    summary, _ = get_observations(session)
     included_species = set(line.strip() for line in fileinput.input())
     expected_species = set(
         (
