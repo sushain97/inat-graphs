@@ -52,7 +52,10 @@ def print_day_unique_species_chart(
     summary: ObservationSummary,
 ):
     rg_species_by_day = {
-        day: set((obs.taxon.name, obs.taxon.preferred_common_name) for obs in group)
+        day: set(
+            (species_name(obs.taxon.name), obs.taxon.preferred_common_name)
+            for obs in group
+        )
         for day, group in itertools.groupby(
             sorted(
                 summary.research_grade_observations,
@@ -61,8 +64,16 @@ def print_day_unique_species_chart(
             key=lambda obs: obs.observed_on.date(),
         )
     }
+    rg_species_names_by_day = {
+        day: set(species_name for species_name, _ in obs)
+        for day, obs in rg_species_by_day.items()
+    }
     needs_id_species_by_day = {
-        day: set((obs.taxon.name, obs.taxon.preferred_common_name) for obs in group)
+        day: set(
+            (species_name(obs.taxon.name), obs.taxon.preferred_common_name)
+            for obs in group
+            if species_name(obs.taxon.name) not in rg_species_names_by_day.get(day, [])
+        )
         for day, group in itertools.groupby(
             sorted(
                 summary.needs_id_observations, key=lambda obs: obs.observed_on.date()
@@ -70,8 +81,6 @@ def print_day_unique_species_chart(
             key=lambda obs: obs.observed_on.date(),
         )
     }
-    for day in needs_id_species_by_day.keys():
-        needs_id_species_by_day[day] -= rg_species_by_day.get(day, set())
 
     all_days = set(rg_species_by_day.keys()) | set(needs_id_species_by_day.keys())
     best_days = sorted(
