@@ -158,6 +158,7 @@ def print_day_new_lifetime_species_chart(summary: ObservationSummary):
                 termgraph.Colors.Blue,
                 termgraph.Colors.Magenta,
                 termgraph.Colors.Cyan,
+                termgraph.Colors.Yellow,
             ],
             format="{:<6.0f}",
             width=100,
