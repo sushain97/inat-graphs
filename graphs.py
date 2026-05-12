@@ -318,14 +318,16 @@ def print_locality_new_lifetime_species_chart(
 
 
 def print_wingspan_set_coverage(summary: ObservationSummary):
-    with open("wingspan-master.json") as wingspan_data_file:
-        wingspan_data = json.load(wingspan_data_file)
+    with open("wingspan-master.json") as f:
+        wingspan_data = json.load(f)
+    with open("wingspan-hummingbirds.json") as f:
+        wingspan_hummingbird_data = json.load(f)
     birds_by_set = {
         k: list(v)
         for (k, v) in itertools.groupby(
             sorted(wingspan_data, key=lambda w: w["Set"]), key=lambda w: w["Set"]
         )
-    }
+    } | {"hummingbird": wingspan_hummingbird_data}
     research_grade_species = {t.name for t in summary.research_grade_taxons}
     needs_id_species = {t.name for t in summary.needs_id_taxons}
 
