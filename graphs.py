@@ -4,10 +4,12 @@ import collections
 import datetime
 import itertools
 import json
+import textwrap
 import pyinaturalist
 import termgraph
 
 from utils import ObservationSummary, get_observations, species_name
+from days import format_date
 
 
 def print_lifetime_unique_species_chart(
@@ -104,7 +106,7 @@ def print_day_unique_species_chart(
                 [rg_species, needs_id_species]
                 for _, rg_species, needs_id_species, _ in best_days
             ],
-            labels=[str(day) for day, _, _, _ in best_days],
+            labels=[format_date(day) for day, _, _, _ in best_days],
             categories=[
                 "Research Grade",
                 "Needs ID",
@@ -147,7 +149,7 @@ def print_day_new_lifetime_species_chart(summary: ObservationSummary):
                 [counts.get(taxon, 0) for taxon in represented_iconic_taxons]
                 for _, counts in best_days
             ],
-            labels=[str(day) for day, _ in best_days],
+            labels=[format_date(day) for day, _ in best_days],
             categories=represented_iconic_taxons,
         ),
         termgraph.Args(
@@ -213,13 +215,20 @@ def print_best_days_new_needs_id_species(
         if day < min_date or not species:
             continue
         print(
-            f"{day} ({len(species)}): "
-            + ", ".join(
-                (
-                    f"{common_name if common_name else species_name}"
-                    + (" ⭐" if species_name in needs_id_species else "")
+            f"{format_date(day)} - {len(species)}\n"
+            + "\n".join(
+                textwrap.wrap(
+                    ", ".join(
+                        (
+                            f"{common_name if common_name else species_name}"
+                            + (" ⭐" if species_name in needs_id_species else "")
+                        )
+                        for species_name, common_name in species
+                    ),
+                    initial_indent="  ",
+                    subsequent_indent="  ",
+                    width=120,
                 )
-                for species_name, common_name in species
             )
         )
 
