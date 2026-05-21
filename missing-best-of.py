@@ -22,6 +22,8 @@ def main():
         and observation.taxon.iconic_taxon_name
         not in ["Fungi", "Arachnida", "Insecta", "Mollusca"]
         and observation.observed_on.date() >= datetime.date(2025, 10, 8)
+        and "Arthropoda" not in {a.name for a in observation.taxon.ancestors}
+        and observation.taxon.preferred_common_name not in ["Domestic Mallard"]
     )
     for species in sorted(expected_species - included_species):
         print(species)
