@@ -173,18 +173,25 @@ def print_new_needs_id_species(summary: ObservationSummary):
         species_name(taxon.name) for taxon in summary.research_grade_taxons
     )
     min_date = datetime.date.today() - datetime.timedelta(days=30)
-    new_needs_id_species_observations = itertools.groupby(
-        sorted(
-            [
-                obs
-                for obs in summary.needs_id_observations
-                if species_name(obs.taxon.name) not in research_grade_species_taxons
-                and obs.observed_on.date() >= min_date
-            ],
-            key=lambda obs: obs.observed_on,
-            reverse=True,
-        ),
-        key=lambda obs: species_name(obs.taxon.name),
+    new_needs_id_species_observations = sorted(
+        [
+            (name, list(observations))
+            for name, observations in itertools.groupby(
+                sorted(
+                    [
+                        obs
+                        for obs in summary.needs_id_observations
+                        if species_name(obs.taxon.name)
+                        not in research_grade_species_taxons
+                        and obs.observed_on.date() >= min_date
+                    ],
+                    key=lambda obs: species_name(obs.taxon.name),
+                ),
+                key=lambda obs: species_name(obs.taxon.name),
+            )
+        ],
+        key=lambda g: max(obs.observed_on.date() for obs in g[1]),
+        reverse=True,
     )
 
     print()
