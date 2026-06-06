@@ -197,8 +197,7 @@ def print_new_needs_id_species(summary: ObservationSummary):
     print()
     print("# New Needs ID Species Observations (last 30 days)")
     print()
-    for name, group in new_needs_id_species_observations:
-        observations = list(group)
+    for name, observations in new_needs_id_species_observations:
         print(
             f"{observations[0].taxon.emoji} {name}{f' ({observations[0].taxon.preferred_common_name})' if observations[0].taxon.preferred_common_name else ''}: "
             + f"{', '.join(sorted(set(str(obs.observed_on.date()) for obs in observations), reverse=True))}"
