@@ -471,7 +471,7 @@ def render_needs_id_best_days(
             st.markdown("\n".join(f"- {l}" for l in labels))
 
 
-st.set_page_config(page_title="🦜Birding", layout="wide")
+st.set_page_config(page_title="🦜 Birding", layout="wide")
 st.set_option("client.toolbarMode", "viewer")
 st.html("""<style>
         .stMainBlockContainer {
@@ -484,7 +484,7 @@ st.html("""<style>
 </style>""")
 
 title_col, btn_col = st.columns([10, 1])
-title_col.title("🦜Birding")
+title_col.title("🦜 Birding")
 if btn_col.button("↺ Refresh", use_container_width=True):
     st.cache_resource.clear()
     st.cache_data.clear()
