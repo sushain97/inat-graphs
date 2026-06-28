@@ -312,10 +312,13 @@ def new_needs_id_rows(summary: ObservationSummary) -> list[dict]:
     ):
         obs_list = list(group)
         dates = sorted({str(o.observed_on.date()) for o in obs_list}, reverse=True)
+        common_name = obs_list[0].taxon.preferred_common_name
+        emoji = obs_list[0].taxon.emoji
         rows.append(
             {
-                "Species": name,
-                "Common name": obs_list[0].taxon.preferred_common_name or "",
+                "Name": f"{emoji} {common_name} ({name})"
+                if common_name
+                else f"{emoji} {name}",
                 "Last seen": dates[0],
                 "All dates": ", ".join(dates),
             }

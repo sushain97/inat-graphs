@@ -14,6 +14,7 @@ LABELED_DATES = {
     "2026-04-05": "Coyote Point + Red Morton",
     "2026-04-17": "Shinjuku Gyoen + Meiji Jingu",
     "2026-04-18": "Kasai Rinkai + Imperial Garden",
+    "2026-04-20": "Hakone",
     "2026-05-09": "Ocean Beach + GGP",
     "2026-05-10": "Point Reyes",
     "2026-05-30": "Coyote Hills",
