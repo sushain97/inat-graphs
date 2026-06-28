@@ -93,6 +93,7 @@ def build_lifetime_species_figure(summary: ObservationSummary) -> go.Figure:
     figure.update_layout(
         barmode="group",
         xaxis_title="Species count",
+        yaxis=dict(tickfont=dict(size=14)),
         margin_t=0,
         legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
     )
@@ -286,6 +287,7 @@ def build_localities_figure(summary: ObservationSummary) -> go.Figure:
         xaxis_rangemode="tozero",
         yaxis_type="category",
         margin_t=0,
+        yaxis=dict(tickfont=dict(size=14)),
         legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
     )
     return figure
@@ -437,6 +439,7 @@ def build_wingspan_coverage_figure(summary: ObservationSummary) -> go.Figure:
         barmode="stack",
         xaxis_title="Bird count",
         margin_t=0,
+        yaxis=dict(tickfont=dict(size=14)),
         legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
     )
     return figure, (total_rg, total_all)
@@ -470,6 +473,15 @@ def render_needs_id_best_days(
 
 st.set_page_config(page_title="🦜Birding", layout="wide")
 st.set_option("client.toolbarMode", "viewer")
+st.html("""<style>
+        .stMainBlockContainer {
+            padding-top: 2.5rem;
+        }
+
+        .stAppHeader {
+            display: none;
+        }
+</style>""")
 
 title_col, btn_col = st.columns([10, 1])
 title_col.title("🦜Birding")
