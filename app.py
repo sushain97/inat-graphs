@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import collections
 import datetime
 import itertools
@@ -12,20 +13,11 @@ import streamlit as st
 from days import format_date
 from utils import ObservationSummary, get_observations, species_name
 
-GREEN = "#2ecc71"
-YELLOW = "#f1c40f"
-RED = "#e74c3c"
-BLUE = "#3498db"
-MAGENTA = "#9b59b6"
-CYAN = "#1abc9c"
-DARK = "#7f8c8d"
-ORANGE = "#e67e22"
-
-TAXON_COLORS = [GREEN, RED, BLUE, MAGENTA, CYAN, YELLOW, DARK, ORANGE]
 BASE_DIR = Path(__file__).parent
+PLOTLY_CONFIG = {"displayModeBar": False}
 
 
-@st.cache_resource(ttl=3600)
+@st.cache_resource(ttl=3600, show_spinner="Loading observations…")
 def fetch_observations():
     session = pyinaturalist.ClientSession()
     return get_observations(session)
@@ -43,59 +35,63 @@ def fetch_place_names(place_ids: tuple[int, ...]) -> dict[int, str]:
     return result
 
 
-def lifetime_species_fig(summary: ObservationSummary) -> go.Figure:
-    rg = dict(
-        collections.Counter(
-            t.iconic_taxon_name for t in summary.research_grade_taxons
-        ).most_common()
+def build_lifetime_species_figure(summary: ObservationSummary) -> go.Figure:
+    research_grade_counts = dict(
+        collections.Counter(t.iconic_taxon_name for t in summary.research_grade_taxons)
     )
-    nid = dict(
-        collections.Counter(
-            t.iconic_taxon_name for t in summary.needs_id_taxons
-        ).most_common()
+    needs_id_counts = dict(
+        collections.Counter(t.iconic_taxon_name for t in summary.needs_id_taxons)
     )
-    taxons = list(rg.keys())
+    taxons = sorted(research_grade_counts, key=research_grade_counts.get)
 
-    fig = go.Figure()
-    fig.add_trace(
+    figure = go.Figure()
+    figure.add_trace(
         go.Bar(
-            name=f"Research Grade ({sum(rg.values())})",
+            name=f"Needs ID ({sum(needs_id_counts.values())})",
             y=taxons,
-            x=[rg[t] for t in taxons],
+            x=[needs_id_counts.get(t, 0) for t in taxons],
             orientation="h",
-            marker_color=GREEN,
+            hovertemplate="%{x}<extra></extra>",
+            marker_color="gold",
+            legendrank=2,
         )
     )
-    fig.add_trace(
+    figure.add_trace(
         go.Bar(
-            name=f"Needs ID ({sum(nid.values())})",
+            name=f"Research Grade ({sum(research_grade_counts.values())})",
             y=taxons,
-            x=[nid.get(t, 0) for t in taxons],
+            x=[research_grade_counts[t] for t in taxons],
             orientation="h",
-            marker_color=YELLOW,
+            hovertemplate="%{x}<extra></extra>",
+            marker_color="mediumseagreen",
+            legendrank=1,
         )
     )
-    fig.update_layout(
-        title="Lifetime Species by Iconic Taxon",
+    figure.update_layout(
         barmode="group",
-        xaxis_title="Species Count",
-        height=max(300, len(taxons) * 55),
+        xaxis_title="Species count",
+        margin_t=0,
+        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
     )
-    return fig
+    return figure
 
 
-def top_days_fig(summary: ObservationSummary):
-    rg_species_by_day = {
+def build_top_days_figure(summary: ObservationSummary):
+    research_grade_species_by_day = {
         day: set(
             (species_name(obs.taxon.name), obs.taxon.preferred_common_name)
             for obs in group
         )
         for day, group in itertools.groupby(
-            sorted(summary.research_grade_observations, key=lambda o: o.observed_on.date()),
+            sorted(
+                summary.research_grade_observations, key=lambda o: o.observed_on.date()
+            ),
             key=lambda o: o.observed_on.date(),
         )
     }
-    rg_names_by_day = {day: {sn for sn, _ in obs} for day, obs in rg_species_by_day.items()}
+    rg_names_by_day = {
+        day: {sn for sn, _ in obs} for day, obs in research_grade_species_by_day.items()
+    }
     needs_id_species_by_day = {
         day: set(
             (species_name(obs.taxon.name), obs.taxon.preferred_common_name)
@@ -107,86 +103,94 @@ def top_days_fig(summary: ObservationSummary):
             key=lambda o: o.observed_on.date(),
         )
     }
-    all_days = set(rg_species_by_day) | set(needs_id_species_by_day)
+    all_days = set(research_grade_species_by_day) | set(needs_id_species_by_day)
     best_days = sorted(
         [
             (
                 day,
-                len(rg_species_by_day.get(day, set())),
+                len(research_grade_species_by_day.get(day, set())),
                 len(needs_id_species_by_day.get(day, set())),
-                len(rg_species_by_day.get(day, set())) + len(needs_id_species_by_day.get(day, set())),
+                len(research_grade_species_by_day.get(day, set()))
+                + len(needs_id_species_by_day.get(day, set())),
             )
             for day in all_days
         ],
         key=lambda x: (x[3], x[1]),
-        reverse=True,
-    )[:10]
+    )[-10:]
 
     labels = [format_date(d) for d, _, _, _ in best_days]
-    fig = go.Figure()
-    fig.add_trace(
-        go.Bar(
-            name="Research Grade",
-            y=labels,
-            x=[rg for _, rg, _, _ in best_days],
-            orientation="h",
-            marker_color=GREEN,
-        )
-    )
-    fig.add_trace(
+    figure = go.Figure()
+    figure.add_trace(
         go.Bar(
             name="Needs ID",
             y=labels,
             x=[nid for _, _, nid, _ in best_days],
             orientation="h",
-            marker_color=YELLOW,
+            hovertemplate="%{x}<extra></extra>",
+            marker_color="gold",
+            legendrank=2,
         )
     )
-    fig.update_layout(
-        title="Top Days by Unique Species Observed",
+    figure.add_trace(
+        go.Bar(
+            name="Research Grade",
+            y=labels,
+            x=[rg for _, rg, _, _ in best_days],
+            orientation="h",
+            hovertemplate="%{x}<extra></extra>",
+            marker_color="mediumseagreen",
+            legendrank=1,
+        )
+    )
+    figure.update_layout(
         barmode="group",
-        xaxis_title="Species Count",
-        height=420,
+        xaxis_title="Species count",
+        margin_t=0,
+        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
     )
 
-    best_days_needs_id = {d: needs_id_species_by_day.get(d, set()) for d, _, _, _ in best_days}
-    return fig, best_days_needs_id
+    best_days_needs_id = {
+        d: needs_id_species_by_day.get(d, set()) for d, _, _, _ in best_days
+    }
+    return figure, best_days_needs_id
 
 
-def new_species_days_fig(summary: ObservationSummary) -> go.Figure:
-    new_by_day_taxon: dict[datetime.date, collections.Counter] = collections.defaultdict(
-        collections.Counter
+def build_new_species_days_figure(summary: ObservationSummary) -> go.Figure:
+    new_by_day_taxon: dict[datetime.date, collections.Counter] = (
+        collections.defaultdict(collections.Counter)
     )
     for obs in summary.first_research_observations:
         new_by_day_taxon[obs.observed_on.date()][obs.taxon.iconic_taxon_name] += 1
 
     best_days = sorted(
-        new_by_day_taxon.items(), key=lambda x: sum(x[1].values()), reverse=True
-    )[:10]
+        new_by_day_taxon.items(),
+        key=lambda x: sum(x[1].values()),
+    )[-10:]
     taxons = sorted({t for _, counts in best_days for t in counts})
     labels = [format_date(d) for d, _ in best_days]
 
-    fig = go.Figure()
+    figure = go.Figure()
     for i, taxon in enumerate(taxons):
-        fig.add_trace(
+        figure.add_trace(
             go.Bar(
                 name=taxon,
                 y=labels,
                 x=[counts.get(taxon, 0) for _, counts in best_days],
                 orientation="h",
-                marker_color=TAXON_COLORS[i % len(TAXON_COLORS)],
+                hovertemplate="%{x}<extra></extra>",
             )
         )
-    fig.update_layout(
-        title="Top Days by New Research Grade Species",
+    figure.update_layout(
         barmode="stack",
-        xaxis_title="New Species Count",
-        height=420,
+        xaxis_title="New species count",
+        yaxis_type="category",
+        margin_t=0,
+        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
     )
-    return fig
+    return figure
 
 
-def localities_fig(summary: ObservationSummary) -> go.Figure:
+def build_localities_figure(summary: ObservationSummary) -> go.Figure:
     eligible = [
         obs
         for obs in summary.first_research_observations
@@ -205,34 +209,35 @@ def localities_fig(summary: ObservationSummary) -> go.Figure:
         taxon_counts[obs.taxon.iconic_taxon_name] += 1
 
     best_localities = sorted(
-        new_by_locality_taxon.items(), key=lambda x: sum(x[1].values()), reverse=True
-    )[:10]
-    taxons = sorted(taxon_counts, key=taxon_counts.get, reverse=True)  # type: ignore[arg-type]
+        new_by_locality_taxon.items(),
+        key=lambda x: sum(x[1].values()),
+    )[-10:]
+    taxons = sorted(taxon_counts, key=taxon_counts.get, reverse=True)
     labels = [loc for loc, _ in best_localities]
 
-    fig = go.Figure()
-    for i, taxon in enumerate(taxons):
-        fig.add_trace(
+    figure = go.Figure()
+    for _, taxon in enumerate(taxons):
+        figure.add_trace(
             go.Bar(
                 name=taxon,
                 y=labels,
                 x=[counts.get(taxon, 0) for _, counts in best_localities],
                 orientation="h",
-                marker_color=TAXON_COLORS[i % len(TAXON_COLORS)],
+                hovertemplate="%{x}<extra></extra>",
             )
         )
-    fig.update_layout(
-        title="Top Localities by New Research Grade Species",
+    figure.update_layout(
         barmode="stack",
-        xaxis_title="New Species Count",
-        height=420,
+        xaxis_title="New species count",
+        margin_t=0,
+        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
     )
-    return fig
+    return figure
 
 
 def new_needs_id_rows(summary: ObservationSummary) -> list[dict]:
     rg_names = {species_name(t.name) for t in summary.research_grade_taxons}
-    min_date = datetime.date.today() - datetime.timedelta(days=30)
+    min_date = datetime.date.today() - datetime.timedelta(days=60)
 
     rows = []
     for name, group in itertools.groupby(
@@ -252,15 +257,15 @@ def new_needs_id_rows(summary: ObservationSummary) -> list[dict]:
         rows.append(
             {
                 "Species": name,
-                "Common Name": obs_list[0].taxon.preferred_common_name or "",
-                "Last Seen": dates[0],
-                "All Dates": ", ".join(dates),
+                "Common name": obs_list[0].taxon.preferred_common_name or "",
+                "Last seen": dates[0],
+                "All dates": ", ".join(dates),
             }
         )
-    return sorted(rows, key=lambda r: r["Last Seen"], reverse=True)
+    return sorted(rows, key=lambda r: r["Last seen"], reverse=True)
 
 
-def most_seen_fig(summary: ObservationSummary) -> go.Figure:
+def build_most_seen_figure(summary: ObservationSummary) -> go.Figure:
     by_species = itertools.groupby(
         sorted(
             summary.research_grade_observations,
@@ -268,29 +273,33 @@ def most_seen_fig(summary: ObservationSummary) -> go.Figure:
         ),
         key=lambda o: o.taxon.preferred_common_name,
     )
-    top5 = sorted(
-        [(sp, len({o.observed_on.date() for o in obs})) for sp, obs in by_species],
+    top_seen = sorted(
+        [
+            (species, len({o.observed_on.date() for o in obs}))
+            for species, obs in by_species
+        ],
         key=lambda x: x[1],
-        reverse=True,
-    )[:5]
+    )[-5:]
 
-    fig = go.Figure(
+    figure = go.Figure(
         go.Bar(
-            y=[sp for sp, _ in top5],
-            x=[n for _, n in top5],
+            y=[species for species, _ in top_seen],
+            x=[n for _, n in top_seen],
             orientation="h",
-            marker_color=GREEN,
+            hovertemplate="%{x}<extra></extra>",
+            marker_color="mediumseagreen",
         )
     )
-    fig.update_layout(
-        title="Most Seen Research Grade Species (unique days)",
-        xaxis_title="Days Observed",
-        height=300,
+    figure.update_layout(
+        xaxis_title="Days observed",
+        height=250,
+        margin_t=0,
+        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
     )
-    return fig
+    return figure
 
 
-def wingspan_coverage_fig(summary: ObservationSummary) -> go.Figure:
+def build_wingspan_coverage_figure(summary: ObservationSummary) -> go.Figure:
     with open(BASE_DIR / "wingspan-master.json") as f:
         master = json.load(f)
     with open(BASE_DIR / "wingspan-hummingbirds.json") as f:
@@ -305,13 +314,13 @@ def wingspan_coverage_fig(summary: ObservationSummary) -> go.Figure:
     birds_by_set["hummingbird"] = hummingbirds
 
     rg_species = {t.name for t in summary.research_grade_taxons}
-    nid_species = {t.name for t in summary.needs_id_taxons}
+    needs_id_species = {t.name for t in summary.needs_id_taxons}
 
     def category(bird: dict) -> str:
         n = bird["Scientific name"]
         if n in rg_species:
             return "Research Grade"
-        if n in nid_species:
+        if n in needs_id_species:
             return "Needs ID"
         return "Missing"
 
@@ -321,13 +330,14 @@ def wingspan_coverage_fig(summary: ObservationSummary) -> go.Figure:
             {
                 s: {
                     k: len(list(v))
-                    for k, v in itertools.groupby(sorted(birds, key=category), key=category)
+                    for k, v in itertools.groupby(
+                        sorted(birds, key=category), key=category
+                    )
                 }
                 | {"Total": len(birds)}
                 for s, birds in birds_by_set.items()
             }.items(),
             key=lambda i: i[1].get("Research Grade", 0),
-            reverse=True,
         )
     )
 
@@ -338,94 +348,98 @@ def wingspan_coverage_fig(summary: ObservationSummary) -> go.Figure:
         for s, v in counts_by_set.items()
     ]
 
-    fig = go.Figure()
-    for cat, color in [(cats[0], GREEN), (cats[1], YELLOW), (cats[2], "#bdc3c7")]:
-        fig.add_trace(
+    cat_colors = {
+        "Research Grade": "mediumseagreen",
+        "Needs ID": "gold",
+        "Missing": "lightgray",
+    }
+    figure = go.Figure()
+    for cat in cats:
+        figure.add_trace(
             go.Bar(
                 name=cat,
                 y=labels,
                 x=[v.get(cat, 0) for v in counts_by_set.values()],
                 orientation="h",
-                marker_color=color,
+                hovertemplate="%{x}<extra></extra>",
+                marker_color=cat_colors[cat],
             )
         )
-    fig.update_layout(
-        title=f"Wingspan Set Coverage ({total_rg}/{total_all})",
+    figure.update_layout(
         barmode="stack",
-        xaxis_title="Bird Count",
-        height=max(400, len(counts_by_set) * 45),
+        xaxis_title="Bird count",
+        margin_t=0,
+        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
     )
-    return fig
+    return figure, (total_rg, total_all)
 
 
 def render_needs_id_best_days(
     summary: ObservationSummary,
     best_days_needs_id: dict,
 ) -> None:
-    min_date = datetime.date.today() - datetime.timedelta(days=30)
-    nid_species = {species_name(t.name) for t in summary.needs_id_taxons}
+    min_date = datetime.date.today() - datetime.timedelta(days=60)
+    needs_id_species = {species_name(t.name) for t in summary.needs_id_taxons}
 
-    shown = False
-    for day, species in sorted(best_days_needs_id.items(), reverse=True):
-        if day < min_date or not species:
-            continue
-        shown = True
-        tagged = []
-        for sname, common in sorted(species):
-            label = common if common else sname
-            if sname in nid_species:
-                label += " ⭐"
-            tagged.append(label)
+    rows = [
+        (day, species)
+        for day, species in sorted(best_days_needs_id.items(), reverse=True)
+        if day >= min_date and species
+    ]
+
+    if not rows:
+        st.info("No Needs ID species on best days in the last 60 days.")
+        return
+
+    for day, species in rows:
+        labels = [
+            (common if common else sname) + (" ⭐" if sname in needs_id_species else "")
+            for sname, common in sorted(species)
+        ]
         with st.expander(f"{format_date(day)} — {len(species)} species"):
-            st.write(", ".join(tagged))
-    if not shown:
-        st.info("No needs-ID species on best days in the last 30 days.")
+            st.markdown("\n".join(f"- {l}" for l in labels))
 
 
-st.set_page_config(page_title="iNat Graphs", layout="wide")
-st.title("iNat Graphs")
+st.set_page_config(page_title="🦜Birding", layout="wide")
+st.set_option("client.toolbarMode", "viewer")
 
-with st.sidebar:
-    st.header("Data")
-    if st.button("Refresh Data"):
-        st.cache_resource.clear()
-        st.cache_data.clear()
-        st.rerun()
+title_col, btn_col = st.columns([10, 1])
+title_col.title("🦜Birding")
+if btn_col.button("↺ Refresh", use_container_width=True):
+    st.cache_resource.clear()
+    st.cache_data.clear()
+    st.rerun()
 
-summary, _observations = fetch_observations()
+summary, _ = fetch_observations()
 
-st.header("Lifetime Species by Iconic Taxon")
-st.plotly_chart(lifetime_species_fig(summary), use_container_width=True)
+st.subheader("Lifetime species by iconic taxon")
+st.plotly_chart(build_lifetime_species_figure(summary), config=PLOTLY_CONFIG)
 
-st.divider()
-st.header("Top Days by Unique Species")
-top_days_figure, best_days_needs_id = top_days_fig(summary)
-st.plotly_chart(top_days_figure, use_container_width=True)
+top_days_figure, best_days_needs_id = build_top_days_figure(summary)
+st.subheader("Top days by unique species observed")
+st.plotly_chart(top_days_figure, config=PLOTLY_CONFIG)
 
-st.divider()
-st.header("Top Days by New Research Grade Species")
-st.plotly_chart(new_species_days_fig(summary), use_container_width=True)
+st.subheader("Top days by new research grade species")
+st.plotly_chart(build_new_species_days_figure(summary), config=PLOTLY_CONFIG)
 
-st.divider()
-st.header("Top Localities by New Research Grade Species")
-st.plotly_chart(localities_fig(summary), use_container_width=True)
+st.subheader("Top localities by new research grade species")
+st.plotly_chart(build_localities_figure(summary), config=PLOTLY_CONFIG)
 
-st.divider()
-st.header("New Needs-ID Species (last 30 days)")
+st.subheader("New Needs ID species (last 60 days)")
 rows = new_needs_id_rows(summary)
 if rows:
-    st.dataframe(rows, use_container_width=True, hide_index=True)
+    st.dataframe(rows, hide_index=True)
 else:
-    st.info("No new needs-ID species in the last 30 days.")
+    st.info("No new Needs ID species in the last 60 days.")
 
-st.divider()
-st.header("Needs-ID Species on Best Days (last month)")
+st.subheader("Needs ID species on best days (last 60 days)")
 render_needs_id_best_days(summary, best_days_needs_id)
 
-st.divider()
-st.header("Most Seen Research Grade Species")
-st.plotly_chart(most_seen_fig(summary), use_container_width=True)
+st.subheader("Most seen research grade species (unique days)")
+st.plotly_chart(build_most_seen_figure(summary), config=PLOTLY_CONFIG)
 
-st.divider()
-st.header("Wingspan Set Coverage")
-st.plotly_chart(wingspan_coverage_fig(summary), use_container_width=True)
+figure, counts = build_wingspan_coverage_figure(summary)
+st.subheader(
+    f"Wingspan set coverage ({counts[0]}/{counts[1]})", anchor="wingspan-set-coverage"
+)
+st.plotly_chart(figure, config=PLOTLY_CONFIG)
