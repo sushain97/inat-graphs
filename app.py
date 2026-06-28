@@ -9,9 +9,27 @@ from pathlib import Path
 import plotly.graph_objects as go
 import pyinaturalist
 import streamlit as st
+from pyinaturalist.constants import ICONIC_EMOJI, ICONIC_TAXA
 
 from days import format_date
 from utils import ObservationSummary, get_observations, species_name
+
+_TAXON_EMOJI: dict[str, str] = {
+    name: ICONIC_EMOJI[tid] for tid, name in ICONIC_TAXA.items()
+}
+
+
+def taxon_label(name: str) -> str:
+    emoji = _TAXON_EMOJI.get(name, "")
+    return f"{emoji} {name}" if emoji else name
+
+
+def country_flag(display_name: str) -> str:
+    code = display_name.rsplit(",", 1)[-1].strip()
+    if len(code) == 2 and code.isalpha() and code.isupper():
+        return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in code)
+    return ""
+
 
 BASE_DIR = Path(__file__).parent
 PLOTLY_CONFIG = {"displayModeBar": False}
@@ -43,15 +61,18 @@ def build_lifetime_species_figure(summary: ObservationSummary) -> go.Figure:
         collections.Counter(t.iconic_taxon_name for t in summary.needs_id_taxons)
     )
     taxons = sorted(research_grade_counts, key=research_grade_counts.get)
+    taxon_labels = [taxon_label(t) for t in taxons]
 
     figure = go.Figure()
     figure.add_trace(
         go.Bar(
             name=f"Needs ID ({sum(needs_id_counts.values())})",
-            y=taxons,
+            y=taxon_labels,
             x=[needs_id_counts.get(t, 0) for t in taxons],
             orientation="h",
-            hovertemplate="%{x}<extra></extra>",
+            text=[needs_id_counts.get(t, 0) or "" for t in taxons],
+            textposition="outside",
+            hoverinfo="skip",
             marker_color="gold",
             legendrank=2,
         )
@@ -59,10 +80,12 @@ def build_lifetime_species_figure(summary: ObservationSummary) -> go.Figure:
     figure.add_trace(
         go.Bar(
             name=f"Research Grade ({sum(research_grade_counts.values())})",
-            y=taxons,
+            y=taxon_labels,
             x=[research_grade_counts[t] for t in taxons],
             orientation="h",
-            hovertemplate="%{x}<extra></extra>",
+            text=[research_grade_counts[t] or "" for t in taxons],
+            textposition="outside",
+            hoverinfo="skip",
             marker_color="mediumseagreen",
             legendrank=1,
         )
@@ -124,9 +147,10 @@ def build_top_days_figure(summary: ObservationSummary):
         go.Bar(
             name="Needs ID",
             y=labels,
-            x=[nid for _, _, nid, _ in best_days],
+            x=[needs_id for _, _, needs_id, _ in best_days],
             orientation="h",
-            hovertemplate="%{x}<extra></extra>",
+            textposition="outside",
+            hoverinfo="skip",
             marker_color="gold",
             legendrank=2,
         )
@@ -135,9 +159,10 @@ def build_top_days_figure(summary: ObservationSummary):
         go.Bar(
             name="Research Grade",
             y=labels,
-            x=[rg for _, rg, _, _ in best_days],
+            x=[research_grade for _, research_grade, _, _ in best_days],
             orientation="h",
-            hovertemplate="%{x}<extra></extra>",
+            textposition="outside",
+            hoverinfo="skip",
             marker_color="mediumseagreen",
             legendrank=1,
         )
@@ -169,17 +194,30 @@ def build_new_species_days_figure(summary: ObservationSummary) -> go.Figure:
     taxons = sorted({t for _, counts in best_days for t in counts})
     labels = [format_date(d) for d, _ in best_days]
 
+    totals = [sum(counts.values()) for _, counts in best_days]
+
     figure = go.Figure()
     for i, taxon in enumerate(taxons):
         figure.add_trace(
             go.Bar(
-                name=taxon,
+                name=taxon_label(taxon),
                 y=labels,
                 x=[counts.get(taxon, 0) for _, counts in best_days],
                 orientation="h",
                 hovertemplate="%{x}<extra></extra>",
             )
         )
+    figure.add_trace(
+        go.Scatter(
+            y=labels,
+            x=totals,
+            mode="text",
+            text=[f" {t}" for t in totals],
+            textposition="middle right",
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
     figure.update_layout(
         barmode="stack",
         xaxis_title="New species count",
@@ -213,22 +251,40 @@ def build_localities_figure(summary: ObservationSummary) -> go.Figure:
         key=lambda x: sum(x[1].values()),
     )[-10:]
     taxons = sorted(taxon_counts, key=taxon_counts.get, reverse=True)
-    labels = [loc for loc, _ in best_localities]
+    labels = [
+        f"{flag} {loc}" if (flag := country_flag(loc)) else loc
+        for loc, _ in best_localities
+    ]
+
+    totals = [sum(counts.values()) for _, counts in best_localities]
 
     figure = go.Figure()
     for _, taxon in enumerate(taxons):
         figure.add_trace(
             go.Bar(
-                name=taxon,
+                name=taxon_label(taxon),
                 y=labels,
                 x=[counts.get(taxon, 0) for _, counts in best_localities],
                 orientation="h",
                 hovertemplate="%{x}<extra></extra>",
             )
         )
+    figure.add_trace(
+        go.Scatter(
+            y=labels,
+            x=totals,
+            mode="text",
+            text=[f" {t}" for t in totals],
+            textposition="middle right",
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
     figure.update_layout(
         barmode="stack",
         xaxis_title="New species count",
+        xaxis_rangemode="tozero",
+        yaxis_type="category",
         margin_t=0,
         legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
     )
@@ -286,7 +342,9 @@ def build_most_seen_figure(summary: ObservationSummary) -> go.Figure:
             y=[species for species, _ in top_seen],
             x=[n for _, n in top_seen],
             orientation="h",
-            hovertemplate="%{x}<extra></extra>",
+            text=[n for _, n in top_seen],
+            textposition="outside",
+            hoverinfo="skip",
             marker_color="mediumseagreen",
         )
     )
@@ -343,16 +401,15 @@ def build_wingspan_coverage_figure(summary: ObservationSummary) -> go.Figure:
 
     total_rg = sum(v.get("Research Grade", 0) for v in counts_by_set.values())
     total_all = sum(v["Total"] for v in counts_by_set.values())
-    labels = [
-        f"{s} ({v.get('Research Grade', 0)}/{v['Total']})"
-        for s, v in counts_by_set.items()
-    ]
+    labels = list(counts_by_set.keys())
 
     cat_colors = {
         "Research Grade": "mediumseagreen",
         "Needs ID": "gold",
         "Missing": "lightgray",
     }
+    set_totals = [v["Total"] for v in counts_by_set.values()]
+
     figure = go.Figure()
     for cat in cats:
         figure.add_trace(
@@ -365,6 +422,17 @@ def build_wingspan_coverage_figure(summary: ObservationSummary) -> go.Figure:
                 marker_color=cat_colors[cat],
             )
         )
+    figure.add_trace(
+        go.Scatter(
+            y=labels,
+            x=set_totals,
+            mode="text",
+            text=[f" {t}" for t in set_totals],
+            textposition="middle right",
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
     figure.update_layout(
         barmode="stack",
         xaxis_title="Bird count",
