@@ -1,14 +1,13 @@
-FROM python:3.14-slim
+FROM node:24-alpine
 WORKDIR /app
+RUN corepack enable
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 
 COPY . .
+ENV NODE_ENV=production
+RUN pnpm build
 
 EXPOSE 8501
-CMD ["uv", "run", "streamlit", "run", "app.py", \
-     "--server.port=8501", "--server.address=0.0.0.0", \
-     "--server.headless=true", "--browser.gatherUsageStats=false"]
+CMD ["pnpm", "start"]
