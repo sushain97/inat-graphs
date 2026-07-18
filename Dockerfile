@@ -10,4 +10,4 @@ ENV NODE_ENV=production
 RUN pnpm build
 
 EXPOSE 8501
-CMD ["pnpm", "start"]
+CMD ["node_modules/.bin/next", "start", "-p", "8501"]
