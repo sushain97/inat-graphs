@@ -1,0 +1,4 @@
+.next/
+src/lib/inat/schema.d.ts
+data/*.json
+pnpm-lock.yaml

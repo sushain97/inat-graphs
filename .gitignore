@@ -1,12 +1,8 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-
-/.inat-cache.db
+.claude
+node_modules/
+/.next/
+/out/
+*.tsbuildinfo
+next-env.d.ts
+.pnpm-debug.log*
+/src/lib/inat/schema.d.ts
