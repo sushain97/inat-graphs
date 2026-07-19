@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename, stat } from "node:fs/promises";
 import path from "node:path";
+import { flatMap } from "lodash-es";
 import superjson from "superjson";
 import type { Observation, ObservationSummary } from "@/lib/inat/observations";
 import type { BestOfSummary } from "@/lib/immich/best-of";
@@ -29,11 +30,29 @@ async function writeJson(filePath: string, data: unknown): Promise<void> {
   await rename(tmpPath, filePath);
 }
 
-export async function readObservationsSnapshot(): Promise<ObservationsSnapshot | null> {
-  return superjson.parse<ObservationsSnapshot>(
-    await readFile(OBSERVATIONS_PATH, "utf-8"),
-  );
+function cachedFileReader<T>(filePath: string): () => Promise<T | null> {
+  let cache: { mtimeMs: number; data: T } | null = null;
+
+  return async () => {
+    let mtimeMs: number;
+    try {
+      mtimeMs = (await stat(filePath)).mtimeMs;
+    } catch {
+      cache = null;
+      return null;
+    }
+
+    if (!cache || cache.mtimeMs !== mtimeMs) {
+      const raw = await readFile(filePath, "utf-8");
+      cache = { mtimeMs, data: superjson.parse<T>(raw) };
+    }
+
+    return cache.data;
+  };
 }
+
+export const readObservationsSnapshot =
+  cachedFileReader<ObservationsSnapshot>(OBSERVATIONS_PATH);
 
 export async function writeObservationsSnapshot(
   snapshot: ObservationsSnapshot,
@@ -41,10 +60,26 @@ export async function writeObservationsSnapshot(
   await writeJson(OBSERVATIONS_PATH, snapshot);
 }
 
-export async function readBestOfSnapshot(): Promise<BestOfSnapshot | null> {
-  return superjson.parse<BestOfSnapshot>(await readFile(BEST_OF_PATH, "utf-8"));
-}
+export const readBestOfSnapshot =
+  cachedFileReader<BestOfSnapshot>(BEST_OF_PATH);
 
 export async function writeBestOfSnapshot(snapshot: BestOfSnapshot) {
   await writeJson(BEST_OF_PATH, snapshot);
+}
+
+let assetIdCache: { snapshot: BestOfSnapshot; ids: Set<string> } | null = null;
+
+export async function isKnownBestOfAsset(assetId: string): Promise<boolean> {
+  const snapshot = await readBestOfSnapshot();
+  if (!snapshot) return false;
+
+  if (assetIdCache?.snapshot !== snapshot) {
+    const ids = new Set(
+      flatMap(Object.values(snapshot.photos), (classes) =>
+        flatMap(Object.values(classes), (assetIds) => assetIds ?? []),
+      ),
+    );
+    assetIdCache = { snapshot, ids };
+  }
+  return assetIdCache.ids.has(assetId);
 }
