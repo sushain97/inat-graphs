@@ -23,6 +23,7 @@
     "@mantine/core": "^9.4.1",
     "@mantine/hooks": "^9.4.1",
     "env-paths": "^4.0.0",
+    "ip-address": "^10.2.0",
     "lodash-es": "^4.18.1",
     "mantine-datatable": "^9.4.0",
     "next": "16.2.10",
