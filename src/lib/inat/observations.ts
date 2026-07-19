@@ -10,32 +10,40 @@ type RawObservationTaxon = NonNullable<RawObservation["taxon"]> & {
 
 /**
  * Trimmed to just the fields this app reads. Raw API responses balloon
- * memory usage.
+ * memory usage. `preferred_common_name` is the only field iNat doesn't
+ * always populate; everything else is validated in `trimObservation`.
  */
-export type ObservationTaxon = Partial<
+export type ObservationTaxon = Required<
+  Pick<RawObservationTaxon, "id" | "name" | "rank" | "iconic_taxon_name">
+> &
   Pick<
     RawObservationTaxon,
-    | "id"
-    | "name"
-    | "rank"
-    | "iconic_taxon_name"
-    | "preferred_common_name"
-    | "ancestor_ids"
-    | "parent_id"
-  >
->;
+    "preferred_common_name" | "ancestor_ids" | "parent_id"
+  >;
 
-export type Observation = Partial<
+export type Observation = Required<
   Pick<RawObservation, "quality_grade" | "observed_on" | "place_ids">
-> & { taxon?: ObservationTaxon };
+> & { taxon: ObservationTaxon };
 
-function trimObservation(raw: RawObservation): Observation {
+function trimObservation(raw: RawObservation): Observation | undefined {
   const t = raw.taxon as RawObservationTaxon | undefined;
+  if (
+    !raw.quality_grade ||
+    !raw.observed_on ||
+    !raw.place_ids ||
+    !t?.id ||
+    !t.name ||
+    !t.rank ||
+    !t.iconic_taxon_name
+  ) {
+    return undefined;
+  }
+
   return {
     quality_grade: raw.quality_grade,
     observed_on: raw.observed_on,
     place_ids: raw.place_ids,
-    taxon: t && {
+    taxon: {
       id: t.id,
       name: t.name,
       rank: t.rank,
@@ -47,7 +55,7 @@ function trimObservation(raw: RawObservation): Observation {
   };
 }
 
-/** Collapses a subspecies/trinomial name to genus+species; keeps hybrid "×"
+/** Collapses a trinomial name to genus+species; keeps hybrid "×"
  * names intact. */
 export function speciesName(name: string): string {
   if (name.includes("×")) return name;
@@ -69,8 +77,8 @@ const SPECIES_RANKS = new Set(["species", "hybrid", "variety", "subspecies"]);
 export function summarizeObservations(
   observations: readonly Observation[],
 ): ObservationSummary {
-  const speciesObservations = observations.filter(
-    (obs) => obs.taxon?.rank !== undefined && SPECIES_RANKS.has(obs.taxon.rank),
+  const speciesObservations = observations.filter((obs) =>
+    SPECIES_RANKS.has(obs.taxon.rank),
   );
 
   const researchGradeObservations = speciesObservations.filter(
@@ -82,13 +90,11 @@ export function summarizeObservations(
 
   const researchGradeTaxons = new Map<string, ObservationTaxon>();
   for (const obs of researchGradeObservations) {
-    if (!obs.taxon?.name) continue;
     researchGradeTaxons.set(speciesName(obs.taxon.name), obs.taxon);
   }
 
   const needsIdTaxons = new Map<string, ObservationTaxon>();
   for (const obs of needsIdObservations) {
-    if (!obs.taxon?.name) continue;
     const name = speciesName(obs.taxon.name);
     if (!researchGradeTaxons.has(name)) needsIdTaxons.set(name, obs.taxon);
   }
@@ -96,9 +102,8 @@ export function summarizeObservations(
   const seenSpecies = new Set<string>();
   const firstResearchObservations: Observation[] = [];
   for (const obs of [...researchGradeObservations].sort((a, b) =>
-    (a.observed_on ?? "").localeCompare(b.observed_on ?? ""),
+    a.observed_on.localeCompare(b.observed_on),
   )) {
-    if (!obs.taxon?.name) continue;
     const name = speciesName(obs.taxon.name);
     if (!seenSpecies.has(name)) {
       seenSpecies.add(name);
@@ -119,7 +124,9 @@ export async function fetchAllObservations(
   userId: string,
 ): Promise<Observation[]> {
   const raw = await inatClient.fetchAllObservations(userId);
-  return raw.map(trimObservation);
+  return raw
+    .map(trimObservation)
+    .filter((obs): obs is Observation => obs !== undefined);
 }
 
 export async function getObservations(

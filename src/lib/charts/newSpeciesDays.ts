@@ -23,11 +23,11 @@ function taxaByDayAndTaxon(
             ([taxon, taxonObs]) => [
               taxon,
               taxonObs.map((obs) => ({
-                id: obs.taxon?.id,
-                name: obs.taxon?.name,
-                preferred_common_name: obs.taxon?.preferred_common_name,
+                id: obs.taxon.id,
+                name: obs.taxon.name,
+                preferred_common_name: obs.taxon.preferred_common_name,
                 observationsUrl: taxonObservationsUrl(
-                  obs.taxon?.id,
+                  obs.taxon.id,
                   "research",
                   { on: day },
                 ),
@@ -43,9 +43,7 @@ function taxaByDayAndTaxon(
 export function buildNewSpeciesDaysFigure(
   summary: ObservationSummary,
 ): BarChartFigure {
-  const eligible = summary.firstResearchObservations.filter(
-    (obs) => obs.observed_on && obs.taxon?.iconic_taxon_name,
-  );
+  const eligible = summary.firstResearchObservations;
   const byDayTaxon = Object.entries(groupBy(eligible, "observed_on")).map(
     ([day, obsList]) =>
       [day, countBy(obsList, "taxon.iconic_taxon_name")] as const,

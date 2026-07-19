@@ -23,9 +23,7 @@ export interface NewNeedsIdRow {
 
 export function newNeedsIdRows(summary: ObservationSummary): NewNeedsIdRow[] {
   const rgNames = new Set(
-    summary.researchGradeTaxons
-      .filter((t) => t.name)
-      .map((t) => speciesName(t.name!)),
+    summary.researchGradeTaxons.map((t) => speciesName(t.name)),
   );
   const minDate = new Date();
   minDate.setDate(minDate.getDate() - 60);
@@ -33,21 +31,19 @@ export function newNeedsIdRows(summary: ObservationSummary): NewNeedsIdRow[] {
 
   const eligible = summary.needsIdObservations.filter(
     (obs) =>
-      obs.taxon?.name &&
-      obs.observed_on &&
       !rgNames.has(speciesName(obs.taxon.name)) &&
       obs.observed_on >= minDateStr,
   );
-  const bySpecies = groupBy(eligible, (obs) => speciesName(obs.taxon!.name!));
+  const bySpecies = groupBy(eligible, (obs) => speciesName(obs.taxon.name));
 
   const rows: NewNeedsIdRow[] = Object.entries(bySpecies).map(
     ([name, obsList]) => {
-      const taxon = obsList[0].taxon!;
+      const taxon = obsList[0].taxon;
       const commonName = taxon.preferred_common_name;
       const emoji = iconicTaxonEmoji(taxon.iconic_taxon_name);
       const chartTaxon: ChartTaxon = { id: taxon.id, name };
       const dates: NewNeedsIdDate[] = orderBy(
-        uniq(obsList.map((o) => o.observed_on!)),
+        uniq(obsList.map((o) => o.observed_on)),
         [],
         "desc",
       ).map((date) => ({

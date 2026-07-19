@@ -28,16 +28,11 @@ export function buildWingspanCoverageFigure(summary: ObservationSummary): {
   const birdsBySet = getWingspanBirdsBySet();
 
   const taxonByName = new Map<string, ObservationTaxon>();
-  for (const t of summary.needsIdTaxons) if (t.name) taxonByName.set(t.name, t);
-  for (const t of summary.researchGradeTaxons)
-    if (t.name) taxonByName.set(t.name, t);
+  for (const t of summary.needsIdTaxons) taxonByName.set(t.name, t);
+  for (const t of summary.researchGradeTaxons) taxonByName.set(t.name, t);
 
-  const rgSpecies = new Set(
-    summary.researchGradeTaxons.map((t) => t.name).filter(Boolean),
-  );
-  const needsIdSpecies = new Set(
-    summary.needsIdTaxons.map((t) => t.name).filter(Boolean),
-  );
+  const rgSpecies = new Set(summary.researchGradeTaxons.map((t) => t.name));
+  const needsIdSpecies = new Set(summary.needsIdTaxons.map((t) => t.name));
 
   function category(bird: WingspanBird): Category {
     const name = bird["Scientific name"];

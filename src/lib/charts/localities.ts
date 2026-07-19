@@ -34,11 +34,11 @@ function taxaByLocalityAndTaxon(
             ([taxon, taxonObs]) => [
               taxon,
               taxonObs.map((obs) => ({
-                id: obs.taxon?.id,
-                name: obs.taxon?.name,
-                preferred_common_name: obs.taxon?.preferred_common_name,
+                id: obs.taxon.id,
+                name: obs.taxon.name,
+                preferred_common_name: obs.taxon.preferred_common_name,
                 observationsUrl: taxonObservationsUrl(
-                  obs.taxon?.id,
+                  obs.taxon.id,
                   "research",
                   { placeId: placeIdOf(obs) },
                 ),
@@ -56,12 +56,11 @@ export function buildLocalitiesFigure(
   placeNames: ReadonlyMap<number, string>,
 ): BarChartFigure {
   const eligible = summary.firstResearchObservations.filter(
-    (obs) =>
-      obs.place_ids && obs.place_ids.length > 1 && obs.taxon?.iconic_taxon_name,
+    (obs) => obs.place_ids.length > 1,
   );
   const localityOf = (obs: Observation) =>
-    placeNames.get(obs.place_ids![1]) ?? String(obs.place_ids![1]);
-  const placeIdOf = (obs: Observation) => obs.place_ids![1];
+    placeNames.get(obs.place_ids[1]) ?? String(obs.place_ids[1]);
+  const placeIdOf = (obs: Observation) => obs.place_ids[1];
 
   const byLocalityTaxon = Object.entries(groupBy(eligible, localityOf)).map(
     ([locality, obsList]) =>

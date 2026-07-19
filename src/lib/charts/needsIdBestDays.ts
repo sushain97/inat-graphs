@@ -22,9 +22,7 @@ export function needsIdBestDaysRows(
   const minDateStr = minDate.toISOString().slice(0, 10);
 
   const needsIdSpecies = new Set(
-    summary.needsIdTaxons
-      .filter((t) => t.name)
-      .map((t) => speciesName(t.name!)),
+    summary.needsIdTaxons.map((t) => speciesName(t.name)),
   );
 
   return [...bestDaysNeedsId.entries()]

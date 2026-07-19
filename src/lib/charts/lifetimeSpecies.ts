@@ -8,9 +8,9 @@ import { taxonObservationsUrl, type ChartTaxon } from "./taxonLinks";
 import type { BarChartFigure } from "./types";
 
 function countByIconicTaxon(
-  taxons: { iconic_taxon_name?: string }[],
+  taxons: ObservationTaxon[],
 ): Record<string, number> {
-  return countBy(taxons, (t) => t.iconic_taxon_name ?? "Unknown");
+  return countBy(taxons, (t) => t.iconic_taxon_name);
 }
 
 function speciesByIconicTaxon(
@@ -22,7 +22,7 @@ function speciesByIconicTaxon(
       ...t,
       observationsUrl: taxonObservationsUrl(t.id, qualityGrade),
     })),
-    (t) => t.iconic_taxon_name ?? "Unknown",
+    (t) => t.iconic_taxon_name,
   );
 }
 

@@ -19,13 +19,13 @@ function dedupeTaxa(
 ): ChartTaxon[] {
   const bySpecies = new Map<string, ChartTaxon>();
   for (const obs of observations) {
-    const name = speciesName(obs.taxon!.name!);
+    const name = speciesName(obs.taxon.name);
     if (bySpecies.has(name)) continue;
     bySpecies.set(name, {
-      id: obs.taxon!.id,
+      id: obs.taxon.id,
       name,
-      preferred_common_name: obs.taxon!.preferred_common_name,
-      observationsUrl: taxonObservationsUrl(obs.taxon!.id, qualityGrade, {
+      preferred_common_name: obs.taxon.preferred_common_name,
+      observationsUrl: taxonObservationsUrl(obs.taxon.id, qualityGrade, {
         on: day,
       }),
     });
@@ -37,14 +37,10 @@ function taxaMapByDay(
   observations: readonly Observation[],
   qualityGrade: "research" | "needs_id",
 ): Map<string, ChartTaxon[]> {
-  const eligible = observations.filter(
-    (obs) => obs.observed_on && obs.taxon?.name,
-  );
   return new Map(
-    Object.entries(groupBy(eligible, "observed_on")).map(([day, obsList]) => [
-      day,
-      dedupeTaxa(obsList, qualityGrade, day),
-    ]),
+    Object.entries(groupBy(observations, "observed_on")).map(
+      ([day, obsList]) => [day, dedupeTaxa(obsList, qualityGrade, day)],
+    ),
   );
 }
 
@@ -69,8 +65,6 @@ export function buildTopDaysFigure(summary: ObservationSummary): {
 
   const eligibleNeedsId = summary.needsIdObservations.filter(
     (obs) =>
-      obs.observed_on &&
-      obs.taxon?.name &&
       !researchGradeByDay
         .get(obs.observed_on)
         ?.has(speciesName(obs.taxon.name)),

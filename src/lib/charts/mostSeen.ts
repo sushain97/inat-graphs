@@ -7,16 +7,16 @@ export function buildMostSeenFigure(
   summary: ObservationSummary,
 ): BarChartFigure {
   const eligible = summary.researchGradeObservations.filter(
-    (obs) => obs.taxon?.preferred_common_name && obs.observed_on,
+    (obs) => obs.taxon.preferred_common_name,
   );
   const bySpecies = groupBy(
     eligible,
-    (obs) => obs.taxon!.preferred_common_name!,
+    (obs) => obs.taxon.preferred_common_name!,
   );
   const speciesDays = Object.entries(bySpecies).map(([species, obsList]) => ({
     species,
-    count: new Set(obsList.map((o) => o.observed_on!)).size,
-    taxonId: obsList[0].taxon!.id,
+    count: new Set(obsList.map((o) => o.observed_on)).size,
+    taxonId: obsList[0].taxon.id,
   }));
 
   // Sort alphabetically first so the stable count-sort ties off the
