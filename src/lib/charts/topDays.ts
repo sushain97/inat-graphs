@@ -2,41 +2,70 @@ import { groupBy, orderBy } from "lodash-es";
 import type { Observation, ObservationSummary } from "@/lib/inat/observations";
 import { speciesName } from "@/lib/inat/observations";
 import { formatDate } from "@/lib/days";
-import { PLOTLY_LEGEND, type PlotlyFigure } from "./types";
+import {
+  observationsUrl,
+  taxonObservationsUrl,
+  type ChartTaxon,
+} from "./taxonLinks";
+import type { BarChartFigure } from "./types";
 
 /** date -> speciesName -> commonName */
 export type SpeciesByDay = Map<string, Map<string, string>>;
 
-function toSpeciesMap(
+function dedupeTaxa(
   observations: readonly Observation[],
-): Map<string, string> {
-  return new Map(
-    observations.map((obs) => [
-      speciesName(obs.taxon!.name!),
-      obs.taxon!.preferred_common_name ?? "",
-    ]),
-  );
+  qualityGrade: "research" | "needs_id",
+  day: string,
+): ChartTaxon[] {
+  const bySpecies = new Map<string, ChartTaxon>();
+  for (const obs of observations) {
+    const name = speciesName(obs.taxon!.name!);
+    if (bySpecies.has(name)) continue;
+    bySpecies.set(name, {
+      id: obs.taxon!.id,
+      name,
+      preferred_common_name: obs.taxon!.preferred_common_name,
+      observationsUrl: taxonObservationsUrl(obs.taxon!.id, qualityGrade, {
+        on: day,
+      }),
+    });
+  }
+  return [...bySpecies.values()];
 }
 
-function groupSpeciesByDay(observations: readonly Observation[]): SpeciesByDay {
+function taxaMapByDay(
+  observations: readonly Observation[],
+  qualityGrade: "research" | "needs_id",
+): Map<string, ChartTaxon[]> {
   const eligible = observations.filter(
     (obs) => obs.observed_on && obs.taxon?.name,
   );
   return new Map(
     Object.entries(groupBy(eligible, "observed_on")).map(([day, obsList]) => [
       day,
-      toSpeciesMap(obsList),
+      dedupeTaxa(obsList, qualityGrade, day),
+    ]),
+  );
+}
+
+function toSpeciesByDay(taxaByDay: Map<string, ChartTaxon[]>): SpeciesByDay {
+  return new Map(
+    [...taxaByDay].map(([day, taxa]) => [
+      day,
+      new Map(taxa.map((t) => [t.name!, t.preferred_common_name ?? ""])),
     ]),
   );
 }
 
 export function buildTopDaysFigure(summary: ObservationSummary): {
-  figure: PlotlyFigure;
-  bestDaysNeedsId: SpeciesByDay;
+  figure: BarChartFigure;
+  bestDaysNeedsId: Map<string, ChartTaxon[]>;
 } {
-  const researchGradeByDay = groupSpeciesByDay(
+  const researchGradeTaxaByDay = taxaMapByDay(
     summary.researchGradeObservations,
+    "research",
   );
+  const researchGradeByDay = toSpeciesByDay(researchGradeTaxaByDay);
 
   const eligibleNeedsId = summary.needsIdObservations.filter(
     (obs) =>
@@ -46,11 +75,8 @@ export function buildTopDaysFigure(summary: ObservationSummary): {
         .get(obs.observed_on)
         ?.has(speciesName(obs.taxon.name)),
   );
-  const needsIdByDay: SpeciesByDay = new Map(
-    Object.entries(groupBy(eligibleNeedsId, "observed_on")).map(
-      ([day, obsList]) => [day, toSpeciesMap(obsList)],
-    ),
-  );
+  const needsIdTaxaByDay = taxaMapByDay(eligibleNeedsId, "needs_id");
+  const needsIdByDay = toSpeciesByDay(needsIdTaxaByDay);
 
   const allDays = new Set([
     ...researchGradeByDay.keys(),
@@ -65,45 +91,28 @@ export function buildTopDaysFigure(summary: ObservationSummary): {
     ["total", "rg"],
   ).slice(-10);
 
-  const labels = bestDays.map(({ day }) => formatDate(day));
-
-  const figure: PlotlyFigure = {
-    data: [
-      {
-        type: "bar",
-        name: "Needs ID",
-        y: labels,
-        x: bestDays.map((d) => d.needsId),
-        orientation: "h",
-        text: bestDays.map((d) => String(d.needsId || "")),
-        textposition: "outside",
-        hoverinfo: "skip",
-        marker: { color: "gold" },
-        legendrank: 2,
+  const figure: BarChartFigure = {
+    data: bestDays.map((d) => ({
+      category: formatDate(d.day),
+      needsId: d.needsId,
+      researchGrade: d.rg,
+      meta: {
+        needsId: needsIdTaxaByDay.get(d.day) ?? [],
+        researchGrade: researchGradeTaxaByDay.get(d.day) ?? [],
       },
-      {
-        type: "bar",
-        name: "Research Grade",
-        y: labels,
-        x: bestDays.map((d) => d.rg),
-        orientation: "h",
-        text: bestDays.map((d) => String(d.rg || "")),
-        textposition: "outside",
-        hoverinfo: "skip",
-        marker: { color: "mediumseagreen" },
-        legendrank: 1,
-      },
+      labelUrl: observationsUrl({ on: d.day }),
+    })),
+    series: [
+      { key: "researchGrade", name: "Research Grade", color: "mediumseagreen" },
+      { key: "needsId", name: "Needs ID", color: "gold" },
     ],
-    layout: {
-      barmode: "group",
-      xaxis: { title: { text: "Species count" } },
-      margin: { t: 0 },
-      legend: PLOTLY_LEGEND,
-    },
+    mode: "group",
+    xLabel: "Species count",
+    yAxisWidth: 340,
   };
 
-  const bestDaysNeedsId: SpeciesByDay = new Map(
-    bestDays.map(({ day }) => [day, needsIdByDay.get(day) ?? new Map()]),
+  const bestDaysNeedsId: Map<string, ChartTaxon[]> = new Map(
+    bestDays.map(({ day }) => [day, needsIdTaxaByDay.get(day) ?? []]),
   );
 
   return { figure, bestDaysNeedsId };

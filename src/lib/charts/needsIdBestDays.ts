@@ -1,17 +1,21 @@
 import type { ObservationSummary } from "@/lib/inat/observations";
 import { speciesName } from "@/lib/inat/observations";
 import { formatDate } from "@/lib/days";
-import type { SpeciesByDay } from "./topDays";
+import type { ChartTaxon } from "./taxonLinks";
+
+export interface NeedsIdBestDaySpecies extends ChartTaxon {
+  starred: boolean;
+}
 
 export interface NeedsIdBestDay {
   day: string;
   label: string;
-  species: string[];
+  species: NeedsIdBestDaySpecies[];
 }
 
 export function needsIdBestDaysRows(
   summary: ObservationSummary,
-  bestDaysNeedsId: SpeciesByDay,
+  bestDaysNeedsId: Map<string, ChartTaxon[]>,
 ): NeedsIdBestDay[] {
   const minDate = new Date();
   minDate.setDate(minDate.getDate() - 60);
@@ -24,19 +28,21 @@ export function needsIdBestDaysRows(
   );
 
   return [...bestDaysNeedsId.entries()]
-    .filter(([day, species]) => day >= minDateStr && species.size > 0)
+    .filter(([day, species]) => day >= minDateStr && species.length > 0)
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([day, species]) => {
-      const labels = [...species.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([sname, common]) => {
-          const label = common || sname;
-          return needsIdSpecies.has(sname) ? `${label} ⭐` : label;
-        });
+      const sorted = [...species].sort((a, b) =>
+        (a.preferred_common_name || a.name || "").localeCompare(
+          b.preferred_common_name || b.name || "",
+        ),
+      );
       return {
         day,
-        label: `${formatDate(day)} — ${species.size} species`,
-        species: labels,
+        label: `${formatDate(day)} — ${species.length} species`,
+        species: sorted.map((s) => ({
+          ...s,
+          starred: needsIdSpecies.has(speciesName(s.name ?? "")),
+        })),
       };
     });
 }

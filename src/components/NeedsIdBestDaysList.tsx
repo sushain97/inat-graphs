@@ -1,7 +1,8 @@
 "use client";
 
-import { Accordion, Text } from "@mantine/core";
+import { Accordion, Anchor, Text } from "@mantine/core";
 import type { NeedsIdBestDay } from "@/lib/charts/needsIdBestDays";
+import { taxonPageUrl } from "@/lib/charts/taxonLinks";
 
 export function NeedsIdBestDaysList({ rows }: { rows: NeedsIdBestDay[] }) {
   if (rows.length === 0) {
@@ -20,7 +21,16 @@ export function NeedsIdBestDaysList({ rows }: { rows: NeedsIdBestDay[] }) {
           <Accordion.Panel>
             <ul>
               {row.species.map((s) => (
-                <li key={s}>{s}</li>
+                <li key={s.name}>
+                  <Anchor
+                    href={s.observationsUrl ?? taxonPageUrl(s)}
+                    target="_blank"
+                    underline="never"
+                  >
+                    {s.preferred_common_name || s.name}
+                  </Anchor>
+                  {s.starred ? " ⭐" : ""}
+                </li>
               ))}
             </ul>
           </Accordion.Panel>

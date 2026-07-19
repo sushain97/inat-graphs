@@ -8,7 +8,8 @@ import { buildMostSeenFigure } from "@/lib/charts/mostSeen";
 import { buildWingspanCoverageFigure } from "@/lib/charts/wingspanCoverage";
 import { newNeedsIdRows } from "@/lib/charts/newNeedsId";
 import { needsIdBestDaysRows } from "@/lib/charts/needsIdBestDays";
-import { PlotlyChart } from "@/components/PlotlyChart";
+import { BarChart } from "@/components/charts/BarChart";
+import { BarChartWithSpeciesDialog } from "@/components/charts/BarChartWithSpeciesDialog";
 import { NewNeedsIdTable } from "@/components/NewNeedsIdTable";
 import { NeedsIdBestDaysList } from "@/components/NeedsIdBestDaysList";
 
@@ -51,19 +52,25 @@ export default async function InatPage() {
   return (
     <Stack gap="xl">
       <Section title="Lifetime species by iconic taxon">
-        <PlotlyChart figure={buildLifetimeSpeciesFigure(summary)} />
+        <BarChartWithSpeciesDialog
+          figure={buildLifetimeSpeciesFigure(summary)}
+        />
       </Section>
 
       <Section title="Top days by unique species observed">
-        <PlotlyChart figure={topDaysFigure} />
+        <BarChartWithSpeciesDialog figure={topDaysFigure} />
       </Section>
 
       <Section title="Top days by new research grade species">
-        <PlotlyChart figure={buildNewSpeciesDaysFigure(summary)} />
+        <BarChartWithSpeciesDialog
+          figure={buildNewSpeciesDaysFigure(summary)}
+        />
       </Section>
 
       <Section title="Top localities by new research grade species">
-        <PlotlyChart figure={buildLocalitiesFigure(summary, placeNames)} />
+        <BarChartWithSpeciesDialog
+          figure={buildLocalitiesFigure(summary, placeNames)}
+        />
       </Section>
 
       <Section title="New Needs ID species (last 60 days)">
@@ -77,13 +84,13 @@ export default async function InatPage() {
       </Section>
 
       <Section title="Most seen research grade species (unique days)">
-        <PlotlyChart figure={buildMostSeenFigure(summary)} />
+        <BarChart {...buildMostSeenFigure(summary)} />
       </Section>
 
       <Section
         title={`Wingspan set coverage (${totalResearchGrade}/${totalBirds})`}
       >
-        <PlotlyChart figure={wingspanFigure} />
+        <BarChartWithSpeciesDialog figure={wingspanFigure} />
       </Section>
     </Stack>
   );

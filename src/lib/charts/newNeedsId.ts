@@ -2,11 +2,23 @@ import { groupBy, orderBy, uniq } from "lodash-es";
 import type { ObservationSummary } from "@/lib/inat/observations";
 import { speciesName } from "@/lib/inat/observations";
 import { iconicTaxonEmoji } from "./taxonLabels";
+import {
+  taxonObservationsUrl,
+  taxonPageUrl,
+  type ChartTaxon,
+} from "./taxonLinks";
+
+export interface NewNeedsIdDate {
+  date: string;
+  url: string;
+}
 
 export interface NewNeedsIdRow {
-  name: string;
-  lastSeen: string;
-  allDates: string;
+  taxon: ChartTaxon;
+  label: string;
+  taxonUrl: string;
+  lastSeen: NewNeedsIdDate;
+  allDates: NewNeedsIdDate[];
 }
 
 export function newNeedsIdRows(summary: ObservationSummary): NewNeedsIdRow[] {
@@ -30,22 +42,31 @@ export function newNeedsIdRows(summary: ObservationSummary): NewNeedsIdRow[] {
 
   const rows: NewNeedsIdRow[] = Object.entries(bySpecies).map(
     ([name, obsList]) => {
-      const dates = orderBy(
+      const taxon = obsList[0].taxon!;
+      const commonName = taxon.preferred_common_name;
+      const emoji = iconicTaxonEmoji(taxon.iconic_taxon_name);
+      const chartTaxon: ChartTaxon = { id: taxon.id, name };
+      const dates: NewNeedsIdDate[] = orderBy(
         uniq(obsList.map((o) => o.observed_on!)),
         [],
         "desc",
-      );
-      const commonName = obsList[0].taxon!.preferred_common_name;
-      const emoji = iconicTaxonEmoji(obsList[0].taxon!.iconic_taxon_name);
+      ).map((date) => ({
+        date,
+        url:
+          taxonObservationsUrl(taxon.id, "needs_id", { on: date }) ??
+          taxonPageUrl(chartTaxon),
+      }));
       return {
-        name: commonName
+        taxon: chartTaxon,
+        label: commonName
           ? `${emoji} ${commonName} (${name})`
           : `${emoji} ${name}`,
+        taxonUrl: taxonPageUrl(chartTaxon),
         lastSeen: dates[0],
-        allDates: dates.join(", "),
+        allDates: dates,
       };
     },
   );
 
-  return orderBy(rows, "lastSeen", "desc");
+  return orderBy(rows, (r) => r.lastSeen.date, "desc");
 }

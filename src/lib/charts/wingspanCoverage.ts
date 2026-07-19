@@ -1,10 +1,19 @@
-import { countBy, sortBy, sumBy } from "lodash-es";
-import type { ObservationSummary } from "@/lib/inat/observations";
+import { countBy, groupBy, sortBy, sumBy } from "lodash-es";
+import type {
+  ObservationSummary,
+  ObservationTaxon,
+} from "@/lib/inat/observations";
 import { getWingspanBirdsBySet, type WingspanBird } from "@/lib/wingspan";
-import { PLOTLY_LEGEND, type PlotlyFigure } from "./types";
+import { taxonObservationsUrl, type ChartTaxon } from "./taxonLinks";
+import type { BarChartFigure } from "./types";
 
 type Category = "Research Grade" | "Needs ID" | "Missing";
 const CATEGORIES: Category[] = ["Research Grade", "Needs ID", "Missing"];
+const CATEGORY_KEYS: Record<Category, string> = {
+  "Research Grade": "researchGrade",
+  "Needs ID": "needsId",
+  Missing: "missing",
+};
 const CATEGORY_COLORS: Record<Category, string> = {
   "Research Grade": "mediumseagreen",
   "Needs ID": "gold",
@@ -12,11 +21,16 @@ const CATEGORY_COLORS: Record<Category, string> = {
 };
 
 export function buildWingspanCoverageFigure(summary: ObservationSummary): {
-  figure: PlotlyFigure;
+  figure: BarChartFigure;
   totalResearchGrade: number;
   totalBirds: number;
 } {
   const birdsBySet = getWingspanBirdsBySet();
+
+  const taxonByName = new Map<string, ObservationTaxon>();
+  for (const t of summary.needsIdTaxons) if (t.name) taxonByName.set(t.name, t);
+  for (const t of summary.researchGradeTaxons)
+    if (t.name) taxonByName.set(t.name, t);
 
   const rgSpecies = new Set(
     summary.researchGradeTaxons.map((t) => t.name).filter(Boolean),
@@ -30,6 +44,25 @@ export function buildWingspanCoverageFigure(summary: ObservationSummary): {
     if (rgSpecies.has(name)) return "Research Grade";
     if (needsIdSpecies.has(name)) return "Needs ID";
     return "Missing";
+  }
+
+  function birdTaxon(bird: WingspanBird, cat: Category): ChartTaxon {
+    const name = bird["Scientific name"];
+    const taxon = taxonByName.get(name);
+    const qualityGrade =
+      cat === "Research Grade"
+        ? "research"
+        : cat === "Needs ID"
+          ? "needs_id"
+          : undefined;
+    return {
+      id: taxon?.id,
+      name,
+      preferred_common_name: taxon?.preferred_common_name,
+      observationsUrl: qualityGrade
+        ? taxonObservationsUrl(taxon?.id, qualityGrade)
+        : undefined,
+    };
   }
 
   const countsBySet = sortBy(
@@ -48,38 +81,33 @@ export function buildWingspanCoverageFigure(summary: ObservationSummary): {
     ([, c]) => c["Research Grade"] ?? 0,
   );
   const totalBirds = sumBy(countsBySet, ([, c]) => c.Total);
-  const labels = countsBySet.map(([set]) => set);
-  const setTotals = countsBySet.map(([, c]) => c.Total);
 
-  const figure: PlotlyFigure = {
-    data: [
-      ...CATEGORIES.map((cat) => ({
-        type: "bar" as const,
-        name: cat,
-        y: labels,
-        x: countsBySet.map(([, c]) => c[cat] ?? 0),
-        orientation: "h" as const,
-        hovertemplate: "%{x}<extra></extra>",
-        marker: { color: CATEGORY_COLORS[cat] },
-      })),
-      {
-        type: "scatter",
-        y: labels,
-        x: setTotals,
-        mode: "text",
-        text: setTotals.map((t) => ` ${t}`),
-        textposition: "middle right",
-        showlegend: false,
-        hoverinfo: "skip",
-      },
-    ],
-    layout: {
-      barmode: "stack",
-      xaxis: { title: { text: "Bird count" } },
-      yaxis: { tickfont: { size: 14 } },
-      margin: { t: 0 },
-      legend: PLOTLY_LEGEND,
-    },
+  const figure: BarChartFigure = {
+    data: countsBySet.map(([set, c]) => {
+      const birds = birdsBySet[set];
+      const byCategory = groupBy(birds, category);
+      return {
+        category: set,
+        researchGrade: c["Research Grade"] ?? 0,
+        needsId: c["Needs ID"] ?? 0,
+        missing: c.Missing ?? 0,
+        total: c.Total,
+        meta: Object.fromEntries(
+          CATEGORIES.map((cat) => [
+            CATEGORY_KEYS[cat],
+            (byCategory[cat] ?? []).map((bird) => birdTaxon(bird, cat)),
+          ]),
+        ),
+      };
+    }),
+    series: CATEGORIES.map((cat) => ({
+      key: CATEGORY_KEYS[cat],
+      name: cat,
+      color: CATEGORY_COLORS[cat],
+    })),
+    mode: "stack",
+    xLabel: "Bird count",
+    totalsKey: "total",
   };
 
   return { figure, totalResearchGrade, totalBirds };

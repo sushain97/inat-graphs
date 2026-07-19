@@ -15,6 +15,7 @@ type RawObservationTaxon = NonNullable<RawObservation["taxon"]> & {
 export type ObservationTaxon = Partial<
   Pick<
     RawObservationTaxon,
+    | "id"
     | "name"
     | "rank"
     | "iconic_taxon_name"
@@ -35,6 +36,7 @@ function trimObservation(raw: RawObservation): Observation {
     observed_on: raw.observed_on,
     place_ids: raw.place_ids,
     taxon: t && {
+      id: t.id,
       name: t.name,
       rank: t.rank,
       iconic_taxon_name: t.iconic_taxon_name,
