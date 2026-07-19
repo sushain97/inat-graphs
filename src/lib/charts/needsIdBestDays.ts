@@ -1,3 +1,4 @@
+import { orderBy, sortBy } from "lodash-es";
 import type { ObservationSummary } from "@/lib/inat/observations";
 import { speciesName } from "@/lib/inat/observations";
 import { formatDate } from "@/lib/days";
@@ -25,22 +26,22 @@ export function needsIdBestDaysRows(
     summary.needsIdTaxons.map((t) => speciesName(t.name)),
   );
 
-  return [...bestDaysNeedsId.entries()]
-    .filter(([day, species]) => day >= minDateStr && species.length > 0)
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([day, species]) => {
-      const sorted = [...species].sort((a, b) =>
-        (a.preferred_common_name || a.name || "").localeCompare(
-          b.preferred_common_name || b.name || "",
-        ),
-      );
-      return {
-        day,
-        label: `${formatDate(day)} — ${species.length} species`,
-        species: sorted.map((s) => ({
-          ...s,
-          starred: needsIdSpecies.has(speciesName(s.name ?? "")),
-        })),
-      };
-    });
+  const eligible = [...bestDaysNeedsId.entries()].filter(
+    ([day, species]) => day >= minDateStr && species.length > 0,
+  );
+
+  return orderBy(eligible, ([day]) => day, "desc").map(([day, species]) => {
+    const sorted = sortBy(
+      species,
+      (s) => s.preferred_common_name || s.name || "",
+    );
+    return {
+      day,
+      label: `${formatDate(day)} — ${species.length} species`,
+      species: sorted.map((s) => ({
+        ...s,
+        starred: needsIdSpecies.has(speciesName(s.name ?? "")),
+      })),
+    };
+  });
 }

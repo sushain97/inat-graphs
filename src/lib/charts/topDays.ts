@@ -1,4 +1,4 @@
-import { groupBy, orderBy } from "lodash-es";
+import { groupBy, orderBy, uniqBy } from "lodash-es";
 import type { Observation, ObservationSummary } from "@/lib/inat/observations";
 import { speciesName } from "@/lib/inat/observations";
 import { formatDate } from "@/lib/days";
@@ -17,20 +17,16 @@ function dedupeTaxa(
   qualityGrade: "research" | "needs_id",
   day: string,
 ): ChartTaxon[] {
-  const bySpecies = new Map<string, ChartTaxon>();
-  for (const obs of observations) {
-    const name = speciesName(obs.taxon.name);
-    if (bySpecies.has(name)) continue;
-    bySpecies.set(name, {
+  return uniqBy(observations, (obs) => speciesName(obs.taxon.name)).map(
+    (obs) => ({
       id: obs.taxon.id,
-      name,
+      name: speciesName(obs.taxon.name),
       preferred_common_name: obs.taxon.preferred_common_name,
       observationsUrl: taxonObservationsUrl(obs.taxon.id, qualityGrade, {
         on: day,
       }),
-    });
-  }
-  return [...bySpecies.values()];
+    }),
+  );
 }
 
 function taxaMapByDay(

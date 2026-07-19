@@ -1,3 +1,4 @@
+import { sortBy, uniqBy } from "lodash-es";
 import { inatClient, type RawObservation } from "./client";
 
 type RawObservationTaxon = NonNullable<RawObservation["taxon"]> & {
@@ -88,35 +89,29 @@ export function summarizeObservations(
     (obs) => obs.quality_grade === "needs_id",
   );
 
-  const researchGradeTaxons = new Map<string, ObservationTaxon>();
-  for (const obs of researchGradeObservations) {
-    researchGradeTaxons.set(speciesName(obs.taxon.name), obs.taxon);
-  }
+  const researchGradeTaxons = uniqBy(researchGradeObservations, (obs) =>
+    speciesName(obs.taxon.name),
+  ).map((obs) => obs.taxon);
+  const rgNames = new Set(researchGradeTaxons.map((t) => speciesName(t.name)));
 
-  const needsIdTaxons = new Map<string, ObservationTaxon>();
-  for (const obs of needsIdObservations) {
-    const name = speciesName(obs.taxon.name);
-    if (!researchGradeTaxons.has(name)) needsIdTaxons.set(name, obs.taxon);
-  }
+  const needsIdTaxons = uniqBy(
+    needsIdObservations.filter(
+      (obs) => !rgNames.has(speciesName(obs.taxon.name)),
+    ),
+    (obs) => speciesName(obs.taxon.name),
+  ).map((obs) => obs.taxon);
 
-  const seenSpecies = new Set<string>();
-  const firstResearchObservations: Observation[] = [];
-  for (const obs of [...researchGradeObservations].sort((a, b) =>
-    a.observed_on.localeCompare(b.observed_on),
-  )) {
-    const name = speciesName(obs.taxon.name);
-    if (!seenSpecies.has(name)) {
-      seenSpecies.add(name);
-      firstResearchObservations.push(obs);
-    }
-  }
+  const firstResearchObservations = uniqBy(
+    sortBy(researchGradeObservations, "observed_on"),
+    (obs) => speciesName(obs.taxon.name),
+  );
 
   return {
     researchGradeObservations,
-    researchGradeTaxons: [...researchGradeTaxons.values()],
+    researchGradeTaxons,
     firstResearchObservations,
     needsIdObservations,
-    needsIdTaxons: [...needsIdTaxons.values()],
+    needsIdTaxons,
   };
 }
 

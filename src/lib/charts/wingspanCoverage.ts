@@ -1,8 +1,5 @@
-import { countBy, groupBy, sortBy, sumBy } from "lodash-es";
-import type {
-  ObservationSummary,
-  ObservationTaxon,
-} from "@/lib/inat/observations";
+import { countBy, groupBy, keyBy, sortBy, sumBy } from "lodash-es";
+import type { ObservationSummary } from "@/lib/inat/observations";
 import { getWingspanBirdsBySet, type WingspanBird } from "@/lib/wingspan";
 import { taxonObservationsUrl, type ChartTaxon } from "./taxonLinks";
 import type { BarChartFigure } from "./types";
@@ -27,9 +24,10 @@ export function buildWingspanCoverageFigure(summary: ObservationSummary): {
 } {
   const birdsBySet = getWingspanBirdsBySet();
 
-  const taxonByName = new Map<string, ObservationTaxon>();
-  for (const t of summary.needsIdTaxons) taxonByName.set(t.name, t);
-  for (const t of summary.researchGradeTaxons) taxonByName.set(t.name, t);
+  const taxonByName = keyBy(
+    [...summary.needsIdTaxons, ...summary.researchGradeTaxons],
+    "name",
+  );
 
   const rgSpecies = new Set(summary.researchGradeTaxons.map((t) => t.name));
   const needsIdSpecies = new Set(summary.needsIdTaxons.map((t) => t.name));
@@ -43,7 +41,7 @@ export function buildWingspanCoverageFigure(summary: ObservationSummary): {
 
   function birdTaxon(bird: WingspanBird, cat: Category): ChartTaxon {
     const name = bird["Scientific name"];
-    const taxon = taxonByName.get(name);
+    const taxon = taxonByName[name];
     const qualityGrade =
       cat === "Research Grade"
         ? "research"
