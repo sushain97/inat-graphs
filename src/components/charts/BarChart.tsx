@@ -35,7 +35,6 @@ export interface ChartClick {
 
 const AXIS_COLOR = "#c1c2c5";
 const GRID_COLOR = "rgba(255, 255, 255, 0.1)";
-const DIMMED_OPACITY = 0.55;
 
 function YAxisLinkedTick({
   x,
@@ -88,7 +87,6 @@ export function BarChart({
   totalsKey?: string;
   onBarClick?: (click: ChartClick) => void;
 }) {
-  const [hovered, setHovered] = useState<string | null>(null);
   const [hiddenKeys, setHiddenKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -217,23 +215,10 @@ export function BarChart({
                       })
                   : undefined
               }
-              onMouseEnter={(item: BarRectangleItem) =>
-                setHovered(`${s.key}-${item.originalDataIndex}`)
-              }
-              onMouseLeave={(item: BarRectangleItem) => {
-                const key = `${s.key}-${item.originalDataIndex}`;
-                setHovered((prev) => (prev === key ? null : prev));
-              }}
               shape={(shapeProps: BarRectangleItem) => (
                 <Rectangle
                   {...shapeProps}
                   cursor={onBarClick ? "pointer" : undefined}
-                  fillOpacity={
-                    hovered &&
-                    hovered !== `${s.key}-${shapeProps.originalDataIndex}`
-                      ? DIMMED_OPACITY
-                      : 1
-                  }
                 />
               )}
             >
