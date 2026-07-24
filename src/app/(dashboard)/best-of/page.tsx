@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import {
   Accordion,
   AccordionControl,
@@ -39,11 +40,13 @@ export default async function BestOfPage() {
           </AccordionItem>
         </Accordion>
       )}
-      <BestOfTable
-        rows={buildBestOfRows(bestOf)}
-        photos={bestOf.photos}
-        immichBaseUrl={Config.immichBaseUrl}
-      />
+      <Suspense>
+        <BestOfTable
+          rows={buildBestOfRows(bestOf)}
+          photos={bestOf.photos}
+          immichBaseUrl={Config.immichBaseUrl}
+        />
+      </Suspense>
     </Stack>
   );
 }

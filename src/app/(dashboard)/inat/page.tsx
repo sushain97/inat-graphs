@@ -1,4 +1,6 @@
-import { Stack, Text, Title } from "@mantine/core";
+import { Anchor, Stack, Text, Title } from "@mantine/core";
+import { LinkSimpleIcon } from "@phosphor-icons/react/dist/ssr";
+import styles from "./page.module.css";
 import { readObservationsSnapshot } from "@/lib/snapshot";
 import { buildLifetimeSpeciesFigure } from "@/lib/charts/lifetimeSpecies";
 import { buildTopDaysFigure } from "@/lib/charts/topDays";
@@ -17,6 +19,13 @@ import { NeedsIdBestDaysList } from "@/components/NeedsIdBestDaysList";
 // must never be statically prerendered at build time.
 export const dynamic = "force-dynamic";
 
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 function Section({
   title,
   children,
@@ -24,9 +33,22 @@ function Section({
   title: string;
   children: React.ReactNode;
 }) {
+  const id = slugify(title);
   return (
     <Stack gap="xs">
-      <Title order={4}>{title}</Title>
+      <Title id={id} order={4} className={styles.sectionTitle}>
+        {title}
+        <Anchor
+          href={`#${id}`}
+          component="a"
+          c="dimmed"
+          underline="never"
+          className={styles.anchorIcon}
+          aria-label={`Link to ${title}`}
+        >
+          <LinkSimpleIcon size="0.7em" weight="bold" />
+        </Anchor>
+      </Title>
       {children}
     </Stack>
   );

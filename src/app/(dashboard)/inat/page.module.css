@@ -1,0 +1,21 @@
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.anchorIcon {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0;
+  text-decoration: none;
+  transition: opacity 100ms ease;
+}
+
+.sectionTitle:hover .anchorIcon {
+  opacity: 0.5;
+}
+
+.anchorIcon:hover {
+  opacity: 1 !important;
+}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DataTable, type DataTableSortStatus } from "mantine-datatable";
 import { Stack, TextInput } from "@mantine/core";
 import type { BestOfRow } from "@/lib/immich/best-of";
@@ -9,6 +10,8 @@ import {
   type BestOfClass,
 } from "@/lib/immich/best-of-classes";
 import { PhotoDialog } from "./PhotoDialog";
+
+const SPECIES_PARAM = "species";
 
 const CLASS_LABELS: Partial<Record<BestOfClass, string>> = {
   Male: "Male (♂)",
@@ -23,12 +26,33 @@ export interface BestOfTableProps {
 }
 
 export function BestOfTable({ rows, photos, immichBaseUrl }: BestOfTableProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [sortStatus, setSortStatus] = useState<DataTableSortStatus<BestOfRow>>({
     columnAccessor: "total",
     direction: "desc",
   });
-  const [selected, setSelected] = useState<BestOfRow | null>(null);
+
+  const selectedName = searchParams.get(SPECIES_PARAM);
+  const selected = selectedName
+    ? (rows.find((r) => r.name === selectedName) ?? null)
+    : null;
+
+  const setSelected = useCallback(
+    (row: BestOfRow | null) => {
+      const params = new URLSearchParams(searchParams);
+      if (row) {
+        params.set(SPECIES_PARAM, row.name);
+      } else {
+        params.delete(SPECIES_PARAM);
+      }
+      const query = params.toString();
+      router.push(query ? `${pathname}?${query}` : pathname);
+    },
+    [pathname, router, searchParams],
+  );
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
